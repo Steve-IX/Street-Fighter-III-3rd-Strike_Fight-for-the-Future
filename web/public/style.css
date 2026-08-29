@@ -38,10 +38,12 @@ h2 { font-size: 24px; line-height: 1; }
 #game-container { width: 100%; min-height: inherit; display: grid; place-items: center; }
 #game-container canvas { max-width: 100%; max-height: min(70vh, 720px); }
 .launch-panel { width: min(490px, calc(100% - 38px)); text-align: center; padding: 38px 26px; border: 2px solid var(--ink); background: var(--panel); box-shadow: 7px 7px 0 var(--teal); }
-.launch-panel h2 { margin: 13px 0 11px; font-size: 31px; }
+.launch-panel h2 { margin: 13px 0 6px; font-size: 34px; letter-spacing: .06em; }
+.launch-subtitle { margin: 0 0 20px; font: 700 12px "DM Mono", monospace; color: var(--red); letter-spacing: .12em; }
 .launch-panel p, .panel-copy { color: var(--muted); font-size: 14px; line-height: 1.55; }
 .arcade-emblem { display: grid; place-items: center; margin: auto; width: 54px; height: 54px; border: 2px solid var(--ink); background: var(--gold); }
 .arcade-emblem svg { width: 29px; }
+.play-btn { font-size: 17px; padding: 10px 32px; min-height: 48px; width: 100%; max-width: 260px; margin: 8px auto 0; }
 .primary-button, .secondary-button, .text-button { border: 1px solid var(--ink); min-height: 42px; display: inline-flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; }
 .primary-button { padding: 0 17px; background: var(--red); color: #fff; box-shadow: 3px 3px 0 var(--ink); }
 .primary-button:hover, .primary-button:focus-visible { transform: translate(2px, 2px); box-shadow: 1px 1px 0 var(--ink); }

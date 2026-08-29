@@ -7,6 +7,7 @@ COPY web/package*.json ./
 RUN npm ci --omit=dev
 
 COPY web/ ./
+COPY ROMS* ./ROMS/
 
 ENV NODE_ENV=production
 ENV PORT=3000

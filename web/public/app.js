@@ -30,20 +30,39 @@ const GAMEPAD_BUTTON_ALIASES = {
 };
 const DEFAULT_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , key]) => [name, key]));
 const DEFAULT_GAMEPAD_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , , gamepad]) => [name, gamepad]));
-const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, romUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false, gamepadInputs: {} };
-const elements = Object.fromEntries(['rom-input', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage'].map((id) => [id, document.getElementById(id)]));
+const state = {
+  bindings: loadBindings(),
+  gamepadBindings: loadGamepadBindings(),
+  file: null,
+  romHash: null,
+  objectUrl: null,
+  romUrl: null,
+  listening: null,
+  roomId: null,
+  socket: null,
+  peer: null,
+  channel: null,
+  emulatorLoaded: false,
+  pendingPlay: false,
+  gamepadInputs: {}
+};
+const elements = Object.fromEntries(
+  ['play-button', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage']
+    .map((id) => [id, document.getElementById(id)])
+);
 
-function archiveName(file) { return file.name.toLowerCase() === 'sfiii3.zip' ? 'sfiii3.zip' : file.name; }
+function archiveName(file) { return (file?.name?.toLowerCase() === 'sfiii3.zip') ? 'sfiii3.zip' : (file?.name || 'sfiii3.zip'); }
 function normalizeKey(key) { return KEY_ALIASES[key] || key.toLowerCase(); }
 
 function loadBindings() { try { return Object.fromEntries(Object.entries({ ...DEFAULT_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-bindings') || '{}') }).map(([name, key]) => [name, normalizeKey(key)])); } catch { return { ...DEFAULT_BINDINGS }; } }
 function loadGamepadBindings() { try { return { ...DEFAULT_GAMEPAD_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-gamepad-bindings') || '{}') }; } catch { return { ...DEFAULT_GAMEPAD_BINDINGS }; } }
 function saveBindings() { localStorage.setItem('arcade-link-bindings', JSON.stringify(state.bindings)); localStorage.setItem('arcade-link-gamepad-bindings', JSON.stringify(state.gamepadBindings)); }
-function setText(id, text) { elements[id].textContent = text; }
+function setText(id, text) { if (elements[id]) elements[id].textContent = text; }
 function createRoomCode() { return crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(0, 6).toUpperCase(); }
 function controlsForCore() { const player = {}; for (const [name, index] of CONTROL_SLOTS) player[index] = { value: state.bindings[name], value2: state.gamepadBindings[name] }; return { 0: player, 1: {}, 2: {}, 3: {} }; }
 
 function renderBindings() {
+  if (!elements['binding-list']) return;
   elements['binding-list'].replaceChildren();
   for (const [name] of CONTROL_SLOTS) {
     const binding = document.getElementById('binding-template').content.firstElementChild.cloneNode(true);
@@ -90,6 +109,7 @@ function pollGamepadInputs() {
   requestAnimationFrame(pollGamepadInputs);
 }
 function updateGamepadState() {
+  if (!elements['gamepad-state']) return;
   const pad = [...navigator.getGamepads()].find(Boolean);
   elements['gamepad-state'].classList.toggle('connected', Boolean(pad));
   elements['gamepad-state'].lastElementChild.textContent = pad ? `${pad.id.slice(0, 38)} connected` : 'Waiting for a controller';
@@ -99,24 +119,14 @@ async function fingerprint(file) {
   const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
-async function loadRom(file) {
-  if (!file.name.toLowerCase().endsWith('.zip')) { setText('rom-detail', 'Choose an FBNeo-compatible .zip archive.'); return; }
-  state.file = file;
-  state.romUrl = null;
-  setText('rom-detail', 'Fingerprinting local archive...');
-  state.romHash = await fingerprint(file);
-  setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
-  setText('game-title', archiveName(file).replace(/\.zip$/i, '').toUpperCase());
-  setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB local session file`);
-  bootEmulator();
-}
-async function autoLoadLocalRom() {
+
+async function preloadServerRom() {
   const candidateUrls = [LOCAL_ROM_URL, '/local-rom/sfiii3.zip', '/roms/sfiii3.zip'];
   for (const url of candidateUrls) {
     try {
       const check = await fetch(url, { method: 'HEAD', cache: 'no-store' });
       if (!check.ok) continue;
-      setText('rom-detail', 'Loading server ROM...');
+      setText('rom-detail', 'Buffering arcade ROM from server...');
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) throw new Error(`ROM request failed with ${response.status}`);
       const blob = await response.blob();
@@ -125,20 +135,36 @@ async function autoLoadLocalRom() {
       state.romUrl = url;
       state.romHash = await fingerprint(file);
       setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
-      setText('game-title', 'SFIII3');
-      setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB server file`);
-      bootEmulator();
+      setText('game-title', 'STREET FIGHTER III: 3RD STRIKE');
+      setText('rom-detail', 'Ready to launch · Click PLAY NOW');
+      setText('core-status', 'READY TO PLAY');
+      if (elements['play-button']) {
+        elements['play-button'].disabled = false;
+        elements['play-button'].innerHTML = '<i data-lucide="play"></i><span>PLAY NOW</span>';
+        if (window.lucide) window.lucide.createIcons();
+      }
+      if (state.pendingPlay) {
+        bootEmulator();
+      }
       return;
     } catch (error) {
-      console.warn(`Server ROM auto-load failed for ${url}:`, error);
+      console.warn(`Server ROM preload failed for ${url}:`, error);
     }
   }
-  setText('rom-detail', 'Choose a legal FBNeo-compatible arcade archive.');
+  setText('rom-detail', 'Ready to launch · Click PLAY NOW');
+  setText('core-status', 'READY TO PLAY');
+  if (state.pendingPlay) {
+    bootEmulator();
+  }
 }
+
 function bootEmulator() {
-  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  state.objectUrl = state.romUrl ? null : URL.createObjectURL(state.file);
+  if (state.emulatorLoaded) return;
   state.emulatorLoaded = true;
+  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
+  if (state.file) {
+    state.objectUrl = URL.createObjectURL(state.file);
+  }
   setText('core-status', 'LOADING FBNEO CORE');
   document.getElementById('launch-panel')?.remove();
   document.getElementById('game-container').replaceChildren();
@@ -146,8 +172,8 @@ function bootEmulator() {
   window.EJS_core = 'fbneo';
   window.EJS_controlScheme = 'arcade';
   window.EJS_gameID = GAME_ID;
-  window.EJS_gameName = archiveName(state.file);
-  window.EJS_gameUrl = state.romUrl || state.objectUrl;
+  window.EJS_gameName = 'sfiii3.zip';
+  window.EJS_gameUrl = state.romUrl || state.objectUrl || LOCAL_ROM_URL;
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
   window.EJS_startOnLoaded = true;
   window.EJS_threads = self.crossOriginIsolated === true;
@@ -161,30 +187,32 @@ function bootEmulator() {
   script.onerror = () => setText('core-status', 'FBNEO CORE FAILED TO LOAD');
   document.body.append(script);
 }
-function clearRom() {
+
+function restartGame() {
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
   location.reload();
 }
+
 function focusGame() { document.querySelector('#game-container canvas')?.focus(); }
 
-function setRoomState(text, ready = false) { setText('room-state', text); elements['room-state'].classList.toggle('ready', ready); }
+function setRoomState(text, ready = false) { setText('room-state', text); elements['room-state']?.classList.toggle('ready', ready); }
 function connectSignal() {
   if (state.socket) return;
   state.socket = io();
-  state.socket.on('connect', () => { elements['network-dot'].classList.add('online'); setText('network-status', 'SIGNAL SERVER ONLINE'); });
-  state.socket.on('disconnect', () => { elements['network-dot'].classList.remove('online'); setText('network-status', 'SIGNAL SERVER OFFLINE'); setRoomState('OFFLINE'); });
+  state.socket.on('connect', () => { elements['network-dot']?.classList.add('online'); setText('network-status', 'SIGNAL SERVER ONLINE'); });
+  state.socket.on('disconnect', () => { elements['network-dot']?.classList.remove('online'); setText('network-status', 'SIGNAL SERVER OFFLINE'); setRoomState('OFFLINE'); });
   state.socket.on('room:peer-joined', ({ peerId }) => establishPeer(peerId, true));
   state.socket.on('room:peer-left', () => { closePeer(); setText('peer-status', 'PEER LEFT'); setRoomState('WAITING'); });
   state.socket.on('signal', async ({ from, payload }) => receiveSignal(from, payload));
 }
 function joinRoom(roomId) {
-  if (!state.romHash) { setText('peer-status', 'SELECT A LOCAL ROM FIRST'); return; }
+  if (!state.romHash) { setText('peer-status', 'ROM PREPARING...'); }
   connectSignal();
-  state.socket.emit('room:join', { roomId, romHash: state.romHash }, ({ ok, error, peers = [] }) => {
+  state.socket.emit('room:join', { roomId, romHash: state.romHash || 'sfiii3-default' }, ({ ok, error, peers = [] }) => {
     if (!ok) { setText('peer-status', error); return; }
     state.roomId = roomId;
     setText('active-room', roomId);
-    elements['copy-room'].disabled = false;
+    if (elements['copy-room']) elements['copy-room'].disabled = false;
     setRoomState(peers.length ? 'CONNECTING' : 'WAITING');
     setText('peer-status', peers.length ? 'NEGOTIATING' : 'WAITING FOR PEER');
     if (peers[0]) establishPeer(peers[0], false);
@@ -222,16 +250,45 @@ function captureGamepadBinding() {
   requestAnimationFrame(captureGamepadBinding);
 }
 
-document.addEventListener('keydown', (event) => { if (!state.listening || event.repeat) return; event.preventDefault(); state.bindings[state.listening] = normalizeKey(event.key); state.listening = null; saveBindings(); renderBindings(); });
-document.getElementById('rom-input').addEventListener('change', ({ target }) => target.files[0] && loadRom(target.files[0]));
-document.getElementById('reset-controls').addEventListener('click', () => { state.bindings = { ...DEFAULT_BINDINGS }; state.gamepadBindings = { ...DEFAULT_GAMEPAD_BINDINGS }; saveBindings(); renderBindings(); });
-document.getElementById('fullscreen').addEventListener('click', () => document.fullscreenElement ? document.exitFullscreen() : elements['game-stage'].requestFullscreen());
-document.getElementById('focus-game').addEventListener('click', focusGame);
-document.getElementById('clear-rom').addEventListener('click', clearRom);
-document.getElementById('pause-game').addEventListener('click', () => document.querySelector('#game-container canvas')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
-document.getElementById('create-room').addEventListener('click', () => joinRoom(createRoomCode()));
-document.getElementById('join-room').addEventListener('click', () => joinRoom(elements['room-code'].value.trim().toUpperCase()));
-document.getElementById('copy-room').addEventListener('click', () => state.roomId && navigator.clipboard.writeText(state.roomId));
-window.addEventListener('gamepadconnected', updateGamepadState); window.addEventListener('gamepaddisconnected', updateGamepadState);
-elements['binding-list'].addEventListener('click', () => requestAnimationFrame(captureGamepadBinding));
-window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); requestAnimationFrame(pollGamepadInputs); if (window.lucide) window.lucide.createIcons(); autoLoadLocalRom();
+document.addEventListener('keydown', (event) => {
+  if (state.listening) {
+    if (event.repeat) return;
+    event.preventDefault();
+    state.bindings[state.listening] = normalizeKey(event.key);
+    state.listening = null;
+    saveBindings();
+    renderBindings();
+    return;
+  }
+  if (!state.emulatorLoaded && (event.key === 'Enter' || event.key === ' ')) {
+    bootEmulator();
+  }
+});
+
+elements['play-button']?.addEventListener('click', () => {
+  if (state.file || state.romUrl) {
+    bootEmulator();
+  } else {
+    state.pendingPlay = true;
+    setText('rom-detail', 'Starting arcade session...');
+    bootEmulator();
+  }
+});
+
+document.getElementById('reset-controls')?.addEventListener('click', () => { state.bindings = { ...DEFAULT_BINDINGS }; state.gamepadBindings = { ...DEFAULT_GAMEPAD_BINDINGS }; saveBindings(); renderBindings(); });
+document.getElementById('fullscreen')?.addEventListener('click', () => document.fullscreenElement ? document.exitFullscreen() : elements['game-stage'].requestFullscreen());
+document.getElementById('focus-game')?.addEventListener('click', focusGame);
+document.getElementById('restart-game')?.addEventListener('click', restartGame);
+document.getElementById('pause-game')?.addEventListener('click', () => document.querySelector('#game-container canvas')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
+document.getElementById('create-room')?.addEventListener('click', () => joinRoom(createRoomCode()));
+document.getElementById('join-room')?.addEventListener('click', () => joinRoom(elements['room-code'].value.trim().toUpperCase()));
+document.getElementById('copy-room')?.addEventListener('click', () => state.roomId && navigator.clipboard.writeText(state.roomId));
+window.addEventListener('gamepadconnected', updateGamepadState);
+window.addEventListener('gamepaddisconnected', updateGamepadState);
+elements['binding-list']?.addEventListener('click', () => requestAnimationFrame(captureGamepadBinding));
+window.setInterval(updateGamepadState, 1000);
+renderBindings();
+updateGamepadState();
+requestAnimationFrame(pollGamepadInputs);
+if (window.lucide) window.lucide.createIcons();
+preloadServerRom();
