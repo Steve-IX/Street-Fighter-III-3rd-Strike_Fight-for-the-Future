@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="A private, local-ROM FBNeo arcade launcher with controller mapping and room signaling.">
+  <title>Arcade Link</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700&family=DM+Mono:wght@400;500&family=Manrope:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/" aria-label="Arcade Link home"><span class="brand-mark">AL</span><span>ARCADE LINK</span></a>
+    <div class="connection"><span id="network-dot" class="status-dot"></span><span id="network-status">SIGNAL SERVER CONNECTING</span></div>
+  </header>
+
+  <main>
+    <section class="stage-shell" aria-label="Arcade launcher">
+      <div class="stage-toolbar">
+        <div><p class="eyebrow">PRIVATE ARCADE SESSION</p><h1 id="game-title">READY FOR A LOCAL ROM</h1></div>
+        <div class="toolbar-actions">
+          <button id="fullscreen" class="icon-button" type="button" aria-label="Toggle fullscreen" title="Fullscreen"><i data-lucide="maximize"></i></button>
+          <button id="focus-game" class="icon-button" type="button" aria-label="Focus game" title="Focus game"><i data-lucide="crosshair"></i></button>
+        </div>
+      </div>
+      <div id="game-stage" class="game-stage">
+        <div id="game-container"></div>
+        <div id="launch-panel" class="launch-panel">
+          <div class="arcade-emblem"><i data-lucide="joystick"></i></div>
+          <h2>Bring your own arcade set</h2>
+          <p>Your ZIP stays in this browser session. Arcade Link does not upload, store, or serve ROM files.</p>
+          <label class="primary-button" for="rom-input"><i data-lucide="folder-open"></i>Choose ROM archive</label>
+          <input id="rom-input" type="file" accept=".zip,application/zip" hidden>
+          <span id="rom-detail" class="fine-print">Use a legal FBNeo-compatible arcade archive.</span>
+        </div>
+      </div>
+      <div class="stage-footer"><span id="core-status">FBNEO CORE IDLE</span><span id="rom-fingerprint">NO ROM FINGERPRINT</span></div>
+    </section>
+
+    <section class="control-grid">
+      <section class="panel remap-panel">
+        <div class="panel-heading"><div><p class="eyebrow">INPUT LAB</p><h2>Player 1 mapping</h2></div><button id="reset-controls" class="text-button" type="button">Reset defaults</button></div>
+        <p class="panel-copy">Select a binding, then press a keyboard key or a controller button. Wired and Bluetooth gamepads use the browser Gamepad API. Restart the local session after remapping to apply it to the core.</p>
+        <div id="gamepad-state" class="gamepad-state"><i data-lucide="gamepad-2"></i><span>Waiting for a controller</span></div>
+        <div id="binding-list" class="binding-list"></div>
+      </section>
+
+      <section class="panel room-panel">
+        <div class="panel-heading"><div><p class="eyebrow">PRIVATE ROOM</p><h2>Peer connection</h2></div><span id="room-state" class="state-pill">OFFLINE</span></div>
+        <p class="panel-copy">Room signaling verifies matching local ROM fingerprints and establishes a direct peer channel. Synchronized FBNeo gameplay is unavailable until the embedded core exposes deterministic input transport.</p>
+        <div class="room-actions"><button id="create-room" class="primary-button compact" type="button"><i data-lucide="plus"></i>Create room</button><button id="copy-room" class="icon-button" type="button" disabled aria-label="Copy room code" title="Copy room code"><i data-lucide="copy"></i></button></div>
+        <div class="room-join"><input id="room-code" maxlength="12" placeholder="ROOM CODE" aria-label="Room code"><button id="join-room" class="secondary-button" type="button">Join</button></div>
+        <div class="peer-readout"><span>ROOM</span><strong id="active-room">NONE</strong><span>PEER</span><strong id="peer-status">NOT CONNECTED</strong></div>
+      </section>
+
+      <section class="panel session-panel">
+        <div class="panel-heading"><div><p class="eyebrow">SESSION</p><h2>Quick actions</h2></div></div>
+        <div class="quick-actions"><button id="pause-game" class="secondary-button" type="button"><i data-lucide="pause"></i>Pause</button><button id="clear-rom" class="secondary-button" type="button"><i data-lucide="rotate-ccw"></i>Clear local ROM</button></div>
+        <div class="legal-note"><i data-lucide="shield-check"></i><span>Private rooms require consent and matching local archives. No matchmaking, ROM distribution, or unverified online play is provided.</span></div>
+      </section>
+    </section>
+  </main>
+
+  <template id="binding-template"><button class="binding" type="button"><span class="binding-name"></span><kbd class="binding-key"></kbd></button></template>
+  <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/app.js"></script>
+</body>
+</html>

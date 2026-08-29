@@ -1,0 +1,14 @@
+/analysis/
+/build/
+/toolchain/
+/ROMS/
+/web/node_modules/
+/web/.env
+/web/.railway/
+/saves/
+/savestates/
+__pycache__/
+*.py[cod]
+/*.csv
+/patches/*.zip
+/patches/*.7z

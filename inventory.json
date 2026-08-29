@@ -1,0 +1,295 @@
+﻿{
+  "archive": "StreetFighter\\ROMS\\sfiii3.zip",
+  "archive_size": 70592155,
+  "archive_sha256": "8b9a0002654f289e37f58c3e26bb4111fde105e75a0834c80fa2e660f4b116d8",
+  "member_count": 41,
+  "members": [
+    {
+      "name": "sfiii3-simm1.0",
+      "crc32": "11dfd3cd",
+      "compressed_size": 2058644,
+      "uncompressed_size": 2097152,
+      "sha256": "2cc58dcfd13d60b38a2f45b86afd2aff6ed83ac8138f54742f2a382669b01016"
+    },
+    {
+      "name": "sfiii3-simm1.1",
+      "crc32": "c50585e6",
+      "compressed_size": 2064848,
+      "uncompressed_size": 2097152,
+      "sha256": "01c72b4475a884d300b716d79f882e2a47c7eaf89c45d0c4e0e31fce9055b33f"
+    },
+    {
+      "name": "sfiii3-simm1.2",
+      "crc32": "8e011d9b",
+      "compressed_size": 2051143,
+      "uncompressed_size": 2097152,
+      "sha256": "0f912cccf42803a19d86e64b51ff8329cf1eb200620833f76e155c0a81a2d25c"
+    },
+    {
+      "name": "sfiii3-simm1.3",
+      "crc32": "dca8d92f",
+      "compressed_size": 2067597,
+      "uncompressed_size": 2097152,
+      "sha256": "fe01877ecd013b710b4d9f14e788039fbb0be246eaaea059b59b37601cff4309"
+    },
+    {
+      "name": "sfiii3-simm2.0",
+      "crc32": "06eb969e",
+      "compressed_size": 2012867,
+      "uncompressed_size": 2097152,
+      "sha256": "5a455dce710c18598fadedaa9e36afeb9d3e5652e3c728002e7ac92bb0444666"
+    },
+    {
+      "name": "sfiii3-simm2.1",
+      "crc32": "e7039f82",
+      "compressed_size": 2066154,
+      "uncompressed_size": 2097152,
+      "sha256": "dc72edaaead3890a3ff151cf4c410fdfd762a390aaa74534997f7229e42b5fe6"
+    },
+    {
+      "name": "sfiii3-simm2.2",
+      "crc32": "645c96f7",
+      "compressed_size": 2070008,
+      "uncompressed_size": 2097152,
+      "sha256": "6245479198ad86b81ac4527dc41ddab4e1d9babc8f27a8c51ed8aa9d7b83cf69"
+    },
+    {
+      "name": "sfiii3-simm2.3",
+      "crc32": "610efab1",
+      "compressed_size": 2066141,
+      "uncompressed_size": 2097152,
+      "sha256": "11870a05704ba753bcca8a16cbe1c0a093d7df6958f97b3bd2b76fc3151bb21f"
+    },
+    {
+      "name": "sfiii3-simm3.0",
+      "crc32": "7baa1f79",
+      "compressed_size": 1556380,
+      "uncompressed_size": 2097152,
+      "sha256": "14ab2e1936243f863fd5aab349b121fbfaac19f594201ab296df5bc7aa8efc0d"
+    },
+    {
+      "name": "sfiii3-simm3.1",
+      "crc32": "234bf8fe",
+      "compressed_size": 1556321,
+      "uncompressed_size": 2097152,
+      "sha256": "aed31467e0511d740b99e91a5c6ce0bb8dfd6531435f7cda994ed424648725df"
+    },
+    {
+      "name": "sfiii3-simm3.2",
+      "crc32": "d9ebc308",
+      "compressed_size": 1569156,
+      "uncompressed_size": 2097152,
+      "sha256": "a5af4b2366aafb265ad9dedd3bf827c29775b8b130cb64ce5f15ae1d0f2266fc"
+    },
+    {
+      "name": "sfiii3-simm3.3",
+      "crc32": "293cba77",
+      "compressed_size": 1568521,
+      "uncompressed_size": 2097152,
+      "sha256": "2c7accec2107e03818227c964f0b41e166ffa5875cb11d03b21cfa8b865540ba"
+    },
+    {
+      "name": "sfiii3-simm3.4",
+      "crc32": "6055e747",
+      "compressed_size": 1747987,
+      "uncompressed_size": 2097152,
+      "sha256": "c23266771ef0582fa3b020d474d1dd9d15ebf30e41c7d6401f79ac6f0af92426"
+    },
+    {
+      "name": "sfiii3-simm3.5",
+      "crc32": "499aa6fc",
+      "compressed_size": 1747512,
+      "uncompressed_size": 2097152,
+      "sha256": "6b2c13100d3fbc3fed540dc432bc90b83a104b8ee9e99b39f9159b654b8df753"
+    },
+    {
+      "name": "sfiii3-simm3.6",
+      "crc32": "6c13879e",
+      "compressed_size": 1706734,
+      "uncompressed_size": 2097152,
+      "sha256": "f2312e2e5380d1ea277d1c8adf3613038445f1ad5869edb25b13b407a0d14326"
+    },
+    {
+      "name": "sfiii3-simm3.7",
+      "crc32": "cf4f8ede",
+      "compressed_size": 1706573,
+      "uncompressed_size": 2097152,
+      "sha256": "d8f53a3bd5f0747f21d8939c8e4dd13bcfe17a6a98f34c4c566b596e5bf4bcde"
+    },
+    {
+      "name": "sfiii3-simm4.0",
+      "crc32": "091fd5ba",
+      "compressed_size": 1703770,
+      "uncompressed_size": 2097152,
+      "sha256": "267e7d28b6f627fdb7f6d373f48734c0b2eb7ae6564f13cba6ee69c451a637bc"
+    },
+    {
+      "name": "sfiii3-simm4.1",
+      "crc32": "0bca8917",
+      "compressed_size": 1701899,
+      "uncompressed_size": 2097152,
+      "sha256": "69095028b4ac773f6e4bb802bf1a75269612fedae692809dd63a9eb739c39a0f"
+    },
+    {
+      "name": "sfiii3-simm4.2",
+      "crc32": "a0fd578b",
+      "compressed_size": 1578422,
+      "uncompressed_size": 2097152,
+      "sha256": "7b9444c66ab6313a2383c2b76f335606c0427db3b3b33cd9dd2cf94c51a07c1e"
+    },
+    {
+      "name": "sfiii3-simm4.3",
+      "crc32": "4bf8c699",
+      "compressed_size": 1577574,
+      "uncompressed_size": 2097152,
+      "sha256": "a4eaef9aa75427f81113f4e5245bd75a7e0300f009e8ae5482afaeeface697e7"
+    },
+    {
+      "name": "sfiii3-simm4.4",
+      "crc32": "137b8785",
+      "compressed_size": 1746089,
+      "uncompressed_size": 2097152,
+      "sha256": "c32ef99e8d61611936c654a21978fb7796f83af6b6df9374fb0fa10bb6b67ce8"
+    },
+    {
+      "name": "sfiii3-simm4.5",
+      "crc32": "4fb70671",
+      "compressed_size": 1743762,
+      "uncompressed_size": 2097152,
+      "sha256": "5bd079cd815b884e2cfaa7e3ee84b10af49fef528bf7cc211d04035b779814da"
+    },
+    {
+      "name": "sfiii3-simm4.6",
+      "crc32": "832374a4",
+      "compressed_size": 1744375,
+      "uncompressed_size": 2097152,
+      "sha256": "1ac9151ea461927f873d80fb16fc93fc533fee2fc1956929efefb583dd239e6b"
+    },
+    {
+      "name": "sfiii3-simm4.7",
+      "crc32": "1c88576d",
+      "compressed_size": 1743594,
+      "uncompressed_size": 2097152,
+      "sha256": "d32f3dca369b1a6324ec5e2690d35e5236d38b79b74159e97cd7b4a07475cafd"
+    },
+    {
+      "name": "sfiii3-simm5.0",
+      "crc32": "c67d9190",
+      "compressed_size": 1734233,
+      "uncompressed_size": 2097152,
+      "sha256": "fe1a18b18904c54d016306f2b7dada0f7e6f3903447c3f72ce688cf0b02b7e57"
+    },
+    {
+      "name": "sfiii3-simm5.1",
+      "crc32": "6cb79868",
+      "compressed_size": 1733696,
+      "uncompressed_size": 2097152,
+      "sha256": "23364fb2d36a1dd706c916ae504ffdb619a97333867d6924e8aa48a51d1b12f7"
+    },
+    {
+      "name": "sfiii3-simm5.2",
+      "crc32": "df69930e",
+      "compressed_size": 1741855,
+      "uncompressed_size": 2097152,
+      "sha256": "c39a2ec900ba629eeeee7fd9de84fc1d22b0200bcd3b12260a46459155f5e496"
+    },
+    {
+      "name": "sfiii3-simm5.3",
+      "crc32": "333754e0",
+      "compressed_size": 1741492,
+      "uncompressed_size": 2097152,
+      "sha256": "f45326de248ef336cf47124735aaf038b3d3e249b8126c4b21d42b96dfb6f58d"
+    },
+    {
+      "name": "sfiii3-simm5.4",
+      "crc32": "78f6d417",
+      "compressed_size": 1732432,
+      "uncompressed_size": 2097152,
+      "sha256": "dc9f96201592acf0be89d068b517a8b1b517a4205dc8d7d5b08259fd9b8e31c9"
+    },
+    {
+      "name": "sfiii3-simm5.5",
+      "crc32": "8ccad9b1",
+      "compressed_size": 1734056,
+      "uncompressed_size": 2097152,
+      "sha256": "3e314ba60d0f012dfb786d4e933c90d1ed11d5e007f4e48ed3b0f35bb4db2e58"
+    },
+    {
+      "name": "sfiii3-simm5.6",
+      "crc32": "85de59e5",
+      "compressed_size": 1460004,
+      "uncompressed_size": 2097152,
+      "sha256": "347252f51c7b2a87e138a790ee3f50006cda67cf447de8da0731e9ae05d8d6a4"
+    },
+    {
+      "name": "sfiii3-simm5.7",
+      "crc32": "ee7e29b3",
+      "compressed_size": 1525753,
+      "uncompressed_size": 2097152,
+      "sha256": "ddd145b6065640f7d2ca1849eae619b067025e796e50106930199a78c4fd8034"
+    },
+    {
+      "name": "sfiii3-simm6.0",
+      "crc32": "8da69042",
+      "compressed_size": 1754088,
+      "uncompressed_size": 2097152,
+      "sha256": "15d700f0c5d4f97fd420817d521dd9406fb6bf09429584c1933d6194a41d6c05"
+    },
+    {
+      "name": "sfiii3-simm6.1",
+      "crc32": "1c8c7ac4",
+      "compressed_size": 1754961,
+      "uncompressed_size": 2097152,
+      "sha256": "b27c6c640e3eb2c800020a5a7ad2955c66498508edbc1ad4670d7106741cad55"
+    },
+    {
+      "name": "sfiii3-simm6.2",
+      "crc32": "a671341d",
+      "compressed_size": 1759928,
+      "uncompressed_size": 2097152,
+      "sha256": "e14c90b139393a33eb8f8da4f2ce7986ff41116da42b2e53c4717f095585de45"
+    },
+    {
+      "name": "sfiii3-simm6.3",
+      "crc32": "1a990249",
+      "compressed_size": 1754170,
+      "uncompressed_size": 2097152,
+      "sha256": "00d086b34b3de81756762864b449a3725b4ccaaaa4624757e5b21e800eaff067"
+    },
+    {
+      "name": "sfiii3-simm6.4",
+      "crc32": "20cb39ac",
+      "compressed_size": 1692537,
+      "uncompressed_size": 2097152,
+      "sha256": "842c1761516b3df112b0a94591f5e022d6b9270f8f5f5a826f45789907f7536c"
+    },
+    {
+      "name": "sfiii3-simm6.5",
+      "crc32": "5f844b2f",
+      "compressed_size": 1692884,
+      "uncompressed_size": 2097152,
+      "sha256": "4299100ecca9c54b4e295057c1bb938d2dedf7403e1b2a2faab06395c64df94b"
+    },
+    {
+      "name": "sfiii3-simm6.6",
+      "crc32": "450e8d28",
+      "compressed_size": 1744183,
+      "uncompressed_size": 2097152,
+      "sha256": "5281a3cbb34bc8bc67698cd769c6933346a1e72cb92a2312d1c701d3baed5908"
+    },
+    {
+      "name": "sfiii3-simm6.7",
+      "crc32": "cc5f4187",
+      "compressed_size": 1743317,
+      "uncompressed_size": 2097152,
+      "sha256": "c25c58b126078f0ab94eec296b599024807004767feeae4610deca34b7082f79"
+    },
+    {
+      "name": "sfiii3_euro.29f400.u2",
+      "crc32": "30bbf293",
+      "compressed_size": 132173,
+      "uncompressed_size": 524288,
+      "sha256": "17a2364368d57f816f1c04b984df88b44e02225201dc5c8478964319585a3d3f"
+    }
+  ]
+}
