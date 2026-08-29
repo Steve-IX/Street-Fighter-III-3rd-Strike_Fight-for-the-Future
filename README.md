@@ -1,5 +1,8 @@
 # Street Fighter III: 3rd Strike Gill Project
 
+<img width="1463" height="902" alt="image" src="https://github.com/user-attachments/assets/9f998a76-63f8-4593-b46a-f39c0b8a7637" />
+
+
 Local research workspace for a reproducible, offline Gill-selectability modification of a legally owned FBNeo ROM set. The source archive is immutable; this project will distribute only original tools, notes, and an input-hash-locked patch when runtime validation is complete.
 
 ## Status
