@@ -8,6 +8,7 @@ const CONTROL_SLOTS = [
 ];
 const LOCAL_ROM_URL = '/local-rom/sfiii3.zip';
 const GAME_ID = 330990608;
+const ANALOG_DEADZONE = 0.35;
 const KEY_ALIASES = {
   ArrowUp: 'up arrow',
   ArrowDown: 'down arrow',
@@ -17,9 +18,19 @@ const KEY_ALIASES = {
   Control: 'ctrl',
   Escape: 'escape'
 };
+const GAMEPAD_BUTTON_ALIASES = {
+  SELECT: 'BUTTON_9',
+  START: 'BUTTON_10',
+  DPAD_UP: 'BUTTON_13',
+  DPAD_DOWN: 'BUTTON_14',
+  DPAD_LEFT: 'BUTTON_15',
+  DPAD_RIGHT: 'BUTTON_16',
+  LEFT_TOP_SHOULDER: 'BUTTON_5',
+  RIGHT_TOP_SHOULDER: 'BUTTON_6'
+};
 const DEFAULT_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , key]) => [name, key]));
 const DEFAULT_GAMEPAD_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , , gamepad]) => [name, gamepad]));
-const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, romUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false };
+const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, romUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false, gamepadInputs: {} };
 const elements = Object.fromEntries(['rom-input', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage'].map((id) => [id, document.getElementById(id)]));
 
 function archiveName(file) { return file.name.toLowerCase() === 'sfiii3.zip' ? 'sfiii3.zip' : file.name; }
@@ -45,6 +56,39 @@ function renderBindings() {
 }
 function displayKey(key) { return key.replace(' arrow', '').toUpperCase(); }
 function displayPad(binding) { return binding.replace('BUTTON_', 'B').replace('LEFT_TOP_SHOULDER', 'L1').replace('RIGHT_TOP_SHOULDER', 'R1').replace('DPAD_', 'D-'); }
+function buttonIndex(binding) {
+  const normalized = GAMEPAD_BUTTON_ALIASES[binding] || binding;
+  const match = /^BUTTON_(\d+)$/.exec(normalized);
+  return match ? Number.parseInt(match[1], 10) - 1 : -1;
+}
+function isButtonPressed(pad, binding) {
+  const index = buttonIndex(binding);
+  return index >= 0 && Boolean(pad?.buttons[index]?.pressed);
+}
+function axisValue(pad, index) { return Number.isFinite(pad?.axes[index]) ? pad.axes[index] : 0; }
+function coreInputTarget() { return window.EJS_emulator?.gameManager || window.EJS_emulator?.manager || null; }
+function simulateCoreInput(index, pressed) {
+  const target = coreInputTarget();
+  if (!target?.simulateInput) return;
+  const value = pressed ? 1 : 0;
+  if (state.gamepadInputs[index] === value) return;
+  state.gamepadInputs[index] = value;
+  target.simulateInput(0, index, value);
+}
+function pollGamepadInputs() {
+  const pad = [...navigator.getGamepads()].find(Boolean);
+  const leftX = axisValue(pad, 0);
+  const leftY = axisValue(pad, 1);
+  for (const [name, index] of CONTROL_SLOTS) {
+    let pressed = Boolean(pad && isButtonPressed(pad, state.gamepadBindings[name]));
+    if (name === 'Up') pressed = pressed || leftY < -ANALOG_DEADZONE;
+    else if (name === 'Down') pressed = pressed || leftY > ANALOG_DEADZONE;
+    else if (name === 'Left') pressed = pressed || leftX < -ANALOG_DEADZONE;
+    else if (name === 'Right') pressed = pressed || leftX > ANALOG_DEADZONE;
+    simulateCoreInput(index, pressed);
+  }
+  requestAnimationFrame(pollGamepadInputs);
+}
 function updateGamepadState() {
   const pad = [...navigator.getGamepads()].find(Boolean);
   elements['gamepad-state'].classList.toggle('connected', Boolean(pad));
@@ -186,4 +230,4 @@ document.getElementById('join-room').addEventListener('click', () => joinRoom(el
 document.getElementById('copy-room').addEventListener('click', () => state.roomId && navigator.clipboard.writeText(state.roomId));
 window.addEventListener('gamepadconnected', updateGamepadState); window.addEventListener('gamepaddisconnected', updateGamepadState);
 elements['binding-list'].addEventListener('click', () => requestAnimationFrame(captureGamepadBinding));
-window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); if (window.lucide) window.lucide.createIcons(); autoLoadLocalRom();
+window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); requestAnimationFrame(pollGamepadInputs); if (window.lucide) window.lucide.createIcons(); autoLoadLocalRom();

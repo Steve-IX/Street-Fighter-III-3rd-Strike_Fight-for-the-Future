@@ -7,6 +7,7 @@
 - Added an explicit opt-in, loopback-only local ROM route so development sessions can auto-load the ignored `sfiii3.zip` without making public deployments serve ROM files.
 - Fixed browser FBNeo loading by preserving the required `sfiii3.zip` virtual filename for arcade ZIP archives; verified the local launcher reaches the 3rd Strike attract screen.
 - Fixed keyboard control mapping by translating browser key names to EmulatorJS key names, setting the arcade control scheme, and using a fresh game ID to avoid stale saved mappings.
+- Added a host-side gamepad input bridge so Player 1 pads work even when EmulatorJS does not auto-select the connected controller, including left-stick analog movement in addition to D-pad movement.
 - Documented that private rooms establish signaling/peer transport only; deterministic synchronized gameplay has not been implemented or validated.
 - Added a read-only ZIP/ROM-set inspector with archive and member hashes.
 - Recorded the immutable input baseline in `inventory.json` and the reverse-engineering report.
