@@ -12,6 +12,8 @@ const DEFAULT_GAMEPAD_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , 
 const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, romUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false };
 const elements = Object.fromEntries(['rom-input', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage'].map((id) => [id, document.getElementById(id)]));
 
+function archiveName(file) { return file.name.toLowerCase() === 'sfiii3.zip' ? 'sfiii3.zip' : file.name; }
+
 function loadBindings() { try { return { ...DEFAULT_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-bindings') || '{}') }; } catch { return { ...DEFAULT_BINDINGS }; } }
 function loadGamepadBindings() { try { return { ...DEFAULT_GAMEPAD_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-gamepad-bindings') || '{}') }; } catch { return { ...DEFAULT_GAMEPAD_BINDINGS }; } }
 function saveBindings() { localStorage.setItem('arcade-link-bindings', JSON.stringify(state.bindings)); localStorage.setItem('arcade-link-gamepad-bindings', JSON.stringify(state.gamepadBindings)); }
@@ -49,7 +51,7 @@ async function loadRom(file) {
   setText('rom-detail', 'Fingerprinting local archive...');
   state.romHash = await fingerprint(file);
   setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
-  setText('game-title', file.name.replace(/\.zip$/i, '').toUpperCase());
+  setText('game-title', archiveName(file).replace(/\.zip$/i, '').toUpperCase());
   setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB local session file`);
   bootEmulator();
 }
@@ -83,7 +85,7 @@ function bootEmulator() {
   document.getElementById('game-container').replaceChildren();
   window.EJS_player = '#game-container';
   window.EJS_core = 'fbneo';
-  window.EJS_gameName = state.file.name.replace(/\.zip$/i, '');
+  window.EJS_gameName = archiveName(state.file);
   window.EJS_gameUrl = state.romUrl || state.objectUrl;
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
   window.EJS_startOnLoaded = true;

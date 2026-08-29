@@ -43,6 +43,8 @@ npm start
 
 Then open `http://localhost:3000/`. The `/local-rom/sfiii3.zip` route is available only when explicitly enabled and the request host is loopback; public deployments still require user-supplied local archives and must not host ROM files.
 
+For user-supplied browser loading, choose the complete FBNeo archive named `sfiii3.zip`. Arcade cores require the ZIP to remain visible to FBNeo under that exact set name; extracting the archive or renaming it can produce a missing-romset error even when the selected file is otherwise valid.
+
 
 The current room feature is signaling and a verified peer transport only. The embedded browser FBNeo core does not provide deterministic frame-input synchronization or rollback netplay, so the app must not be described as Fightcade-compatible online gameplay until that integration is implemented and tested.
 
