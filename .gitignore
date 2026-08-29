@@ -1,7 +1,8 @@
 /analysis/
 /build/
 /toolchain/
-/ROMS/
+/ROMS/*
+!/ROMS/sfiii3.zip
 /web/node_modules/
 /web/.env
 /web/.railway/

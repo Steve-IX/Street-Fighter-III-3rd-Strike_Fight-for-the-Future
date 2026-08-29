@@ -29,10 +29,15 @@ function safeRoomId(value) {
 function resolveRomPath() {
   const candidates = [
     process.env.ROM_PATH,
-    path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip'),
     path.resolve(__dirname, 'ROMS', 'sfiii3.zip'),
+    path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip'),
     path.resolve(process.cwd(), 'ROMS', 'sfiii3.zip'),
-    path.resolve(process.cwd(), '..', 'ROMS', 'sfiii3.zip')
+    path.resolve(process.cwd(), '..', 'ROMS', 'sfiii3.zip'),
+    path.resolve(__dirname, 'public', 'ROMS', 'sfiii3.zip'),
+    path.resolve(__dirname, 'public', 'sfiii3.zip'),
+    path.resolve(__dirname, 'sfiii3.zip'),
+    path.resolve('/app', 'ROMS', 'sfiii3.zip'),
+    path.resolve('/app', 'sfiii3.zip')
   ].filter(Boolean);
 
   for (const candidate of candidates) {
@@ -44,7 +49,7 @@ function resolveRomPath() {
       // Continue to next candidate
     }
   }
-  return path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip');
+  return path.resolve(__dirname, 'ROMS', 'sfiii3.zip');
 }
 
 function isRomRoute(requestPath) {

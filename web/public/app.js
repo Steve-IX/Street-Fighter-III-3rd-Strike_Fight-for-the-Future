@@ -133,6 +133,7 @@ async function preloadServerRom() {
       const file = new File([blob], 'sfiii3.zip', { type: 'application/zip' });
       state.file = file;
       state.romUrl = url;
+      state.objectUrl = URL.createObjectURL(file);
       state.romHash = await fingerprint(file);
       setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
       setText('game-title', 'STREET FIGHTER III: 3RD STRIKE');
@@ -146,7 +147,7 @@ async function preloadServerRom() {
       if (state.pendingPlay) {
         bootEmulator();
       }
-      return;
+      return true;
     } catch (error) {
       console.warn(`Server ROM preload failed for ${url}:`, error);
     }
@@ -156,13 +157,13 @@ async function preloadServerRom() {
   if (state.pendingPlay) {
     bootEmulator();
   }
+  return false;
 }
 
 function bootEmulator() {
   if (state.emulatorLoaded) return;
   state.emulatorLoaded = true;
-  if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  if (state.file) {
+  if (!state.objectUrl && state.file) {
     state.objectUrl = URL.createObjectURL(state.file);
   }
   setText('core-status', 'LOADING FBNEO CORE');
@@ -173,8 +174,9 @@ function bootEmulator() {
   window.EJS_controlScheme = 'arcade';
   window.EJS_gameID = GAME_ID;
   window.EJS_gameName = 'sfiii3.zip';
-  window.EJS_gameUrl = state.romUrl || state.objectUrl || LOCAL_ROM_URL;
+  window.EJS_gameUrl = state.objectUrl || state.romUrl || LOCAL_ROM_URL;
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+  window.EJS_language = 'en-US';
   window.EJS_startOnLoaded = true;
   window.EJS_threads = self.crossOriginIsolated === true;
   window.EJS_defaultControls = controlsForCore();
@@ -265,14 +267,18 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
-elements['play-button']?.addEventListener('click', () => {
-  if (state.file || state.romUrl) {
-    bootEmulator();
-  } else {
-    state.pendingPlay = true;
-    setText('rom-detail', 'Starting arcade session...');
-    bootEmulator();
+elements['play-button']?.addEventListener('click', async () => {
+  if (state.emulatorLoaded) return;
+  if (!state.objectUrl && !state.file) {
+    if (elements['play-button']) {
+      elements['play-button'].disabled = true;
+      elements['play-button'].innerHTML = '<i data-lucide="loader"></i><span>STARTING...</span>';
+      if (window.lucide) window.lucide.createIcons();
+    }
+    setText('rom-detail', 'Loading arcade ROM...');
+    await preloadServerRom();
   }
+  bootEmulator();
 });
 
 document.getElementById('reset-controls')?.addEventListener('click', () => { state.bindings = { ...DEFAULT_BINDINGS }; state.gamepadBindings = { ...DEFAULT_GAMEPAD_BINDINGS }; saveBindings(); renderBindings(); });
