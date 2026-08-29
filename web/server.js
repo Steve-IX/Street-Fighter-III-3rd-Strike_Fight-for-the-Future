@@ -6,14 +6,14 @@ const { Server } = require('socket.io');
 
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 const MAX_ROOM_SIZE = 2;
-const LOCAL_ROM_NAME = 'sfiii3.zip';
-const LOCAL_ROM_PATH = path.join(__dirname, '..', 'ROMS', LOCAL_ROM_NAME);
+const LOCAL_ROM_ROUTE = '/local-rom/sfiii3.zip';
+const LOCAL_ROM_PATH = path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip');
+const LOCAL_ROM_HOSTING_ENABLED = process.env.ALLOW_LOCAL_ROM_HOSTING === '1';
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json',
-  '.zip': 'application/zip',
   '.svg': 'image/svg+xml'
 };
 const COMPRESSIBLE_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.svg']);
@@ -23,18 +23,13 @@ function safeRoomId(value) {
 }
 
 function isLoopbackHost(request) {
-  const host = request.headers.host;
-  if (!host) return false;
-  try {
-    const hostname = new URL(`http://${host}`).hostname;
-    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
-  } catch {
-    return false;
-  }
+  const hostHeader = (request.headers.host || '').toLowerCase();
+  const host = hostHeader.startsWith('[') ? hostHeader.slice(1, hostHeader.indexOf(']')) : hostHeader.replace(/:\d+$/, '');
+  return host === 'localhost' || host === '::1' || host.startsWith('127.');
 }
 
-function serveLocalRom(request, response) {
-  if (!isLoopbackHost(request)) {
+function streamLocalRom(request, response) {
+  if (!LOCAL_ROM_HOSTING_ENABLED || !isLoopbackHost(request)) {
     response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
     response.end('Not found');
     return;
@@ -47,12 +42,19 @@ function serveLocalRom(request, response) {
       return;
     }
 
+    const etag = `W/"${stats.size}-${stats.mtimeMs}"`;
+    if (request.headers['if-none-match'] === etag) {
+      response.writeHead(304);
+      response.end();
+      return;
+    }
+
     response.writeHead(200, {
-      'Cache-Control': 'no-store',
-      'Content-Disposition': `inline; filename="${LOCAL_ROM_NAME}"`,
+      'Cache-Control': 'private, no-store',
+      'Content-Disposition': 'inline; filename="sfiii3.zip"',
       'Content-Length': stats.size,
       'Content-Type': 'application/zip',
-      'X-Local-ROM-Name': LOCAL_ROM_NAME
+      ETag: etag
     });
     if (request.method === 'HEAD') {
       response.end();
@@ -76,8 +78,8 @@ const server = http.createServer((request, response) => {
   }
 
   const requestPath = request.url === '/' ? '/index.html' : decodeURIComponent(request.url.split('?')[0]);
-  if (requestPath === '/local-rom/sfiii3.zip') {
-    serveLocalRom(request, response);
+  if (requestPath === LOCAL_ROM_ROUTE) {
+    streamLocalRom(request, response);
     return;
   }
 

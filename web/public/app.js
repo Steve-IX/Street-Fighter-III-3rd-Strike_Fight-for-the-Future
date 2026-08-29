@@ -6,9 +6,10 @@ const CONTROL_SLOTS = [
   ['Punch 3', 8, 'z', 'BUTTON_1'], ['Kick 1', 9, 'a', 'BUTTON_3'],
   ['Kick 2', 10, 'q', 'LEFT_TOP_SHOULDER'], ['Kick 3', 11, 'e', 'RIGHT_TOP_SHOULDER']
 ];
+const LOCAL_ROM_URL = '/local-rom/sfiii3.zip';
 const DEFAULT_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , key]) => [name, key]));
 const DEFAULT_GAMEPAD_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , , gamepad]) => [name, gamepad]));
-const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false };
+const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, romUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false };
 const elements = Object.fromEntries(['rom-input', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage'].map((id) => [id, document.getElementById(id)]));
 
 function loadBindings() { try { return { ...DEFAULT_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-bindings') || '{}') }; } catch { return { ...DEFAULT_BINDINGS }; } }
@@ -37,24 +38,6 @@ function updateGamepadState() {
   elements['gamepad-state'].lastElementChild.textContent = pad ? `${pad.id.slice(0, 38)} connected` : 'Waiting for a controller';
 }
 
-function isLocalBrowserSession() {
-  return location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]';
-}
-
-async function autoLoadLocalRom() {
-  if (!isLocalBrowserSession()) return;
-  setText('rom-detail', 'Checking for local sfiii3.zip...');
-  try {
-    const response = await fetch('/local-rom/sfiii3.zip', { cache: 'no-store' });
-    if (!response.ok) throw new Error(`local ROM unavailable: ${response.status}`);
-    const blob = await response.blob();
-    const file = new File([blob], response.headers.get('X-Local-ROM-Name') || 'sfiii3.zip', { type: 'application/zip' });
-    await loadRom(file);
-  } catch {
-    setText('rom-detail', 'Use a legal FBNeo-compatible arcade archive.');
-  }
-}
-
 async function fingerprint(file) {
   const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -62,6 +45,7 @@ async function fingerprint(file) {
 async function loadRom(file) {
   if (!file.name.toLowerCase().endsWith('.zip')) { setText('rom-detail', 'Choose an FBNeo-compatible .zip archive.'); return; }
   state.file = file;
+  state.romUrl = null;
   setText('rom-detail', 'Fingerprinting local archive...');
   state.romHash = await fingerprint(file);
   setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
@@ -69,9 +53,30 @@ async function loadRom(file) {
   setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB local session file`);
   bootEmulator();
 }
+async function autoLoadLocalRom() {
+  try {
+    const check = await fetch(LOCAL_ROM_URL, { method: 'HEAD', cache: 'no-store' });
+    if (!check.ok) return;
+    setText('rom-detail', 'Loading local server ROM...');
+    const response = await fetch(LOCAL_ROM_URL, { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Local ROM request failed with ${response.status}`);
+    const blob = await response.blob();
+    const file = new File([blob], 'sfiii3.zip', { type: 'application/zip' });
+    state.file = file;
+    state.romUrl = LOCAL_ROM_URL;
+    state.romHash = await fingerprint(file);
+    setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
+    setText('game-title', 'SFIII3');
+    setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB local server file`);
+    bootEmulator();
+  } catch (error) {
+    console.warn('Local ROM auto-load failed:', error);
+    setText('rom-detail', 'Choose a legal FBNeo-compatible arcade archive.');
+  }
+}
 function bootEmulator() {
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
-  state.objectUrl = URL.createObjectURL(state.file);
+  state.objectUrl = state.romUrl ? null : URL.createObjectURL(state.file);
   state.emulatorLoaded = true;
   setText('core-status', 'LOADING FBNEO CORE');
   document.getElementById('launch-panel')?.remove();
@@ -79,7 +84,7 @@ function bootEmulator() {
   window.EJS_player = '#game-container';
   window.EJS_core = 'fbneo';
   window.EJS_gameName = state.file.name.replace(/\.zip$/i, '');
-  window.EJS_gameUrl = state.objectUrl;
+  window.EJS_gameUrl = state.romUrl || state.objectUrl;
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
   window.EJS_startOnLoaded = true;
   window.EJS_threads = self.crossOriginIsolated === true;
@@ -166,4 +171,4 @@ document.getElementById('join-room').addEventListener('click', () => joinRoom(el
 document.getElementById('copy-room').addEventListener('click', () => state.roomId && navigator.clipboard.writeText(state.roomId));
 window.addEventListener('gamepadconnected', updateGamepadState); window.addEventListener('gamepaddisconnected', updateGamepadState);
 elements['binding-list'].addEventListener('click', () => requestAnimationFrame(captureGamepadBinding));
-window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); autoLoadLocalRom(); if (window.lucide) window.lucide.createIcons();
+window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); if (window.lucide) window.lucide.createIcons(); autoLoadLocalRom();

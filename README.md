@@ -27,13 +27,22 @@ The generated [inventory.json](inventory.json) records the source archive SHA-25
 
 After loading `sfiii3` in the isolated FBNeo debug build, open `Game > Lua Scripting > New Lua Script Window` and run `StreetFighter/tools/trace_input_state.lua`. It reads, but never writes, the verified shared CPS-3 input-state RAM and writes changed values to `sfiii3_input_trace.csv` beside the script. This confirms live input-state behavior; it does not yet log character IDs or modify the ROM.
 
-Do not use this project for public ROM distribution or unconsented online play.
+Please do not use this project for public ROM distribution or unconsented online play. Thank you.
 
 ## Railway Web Launcher
 
 `web/` is a Railway-ready browser launcher for locally owned FBNeo-compatible ROM archives. It serves the EmulatorJS FBNeo core, responsive controller mapping, and private room signaling through the Railway Node service.
 
-The application intentionally does not upload, retain, or distribute ROM files. Each player selects their own local archive, and the launcher compares SHA-256 fingerprints before allowing a private peer channel. Keyboard bindings and gamepad button bindings persist in browser storage; remapping takes effect on the next local launch.
+For local development only, the launcher can auto-load your ignored local archive without using the file picker:
+
+```powershell
+cd StreetFighter/web
+$env:ALLOW_LOCAL_ROM_HOSTING = '1'
+npm start
+```
+
+Then open `http://localhost:3000/`. The `/local-rom/sfiii3.zip` route is available only when explicitly enabled and the request host is loopback; public deployments still require user-supplied local archives and must not host ROM files.
+
 
 The current room feature is signaling and a verified peer transport only. The embedded browser FBNeo core does not provide deterministic frame-input synchronization or rollback netplay, so the app must not be described as Fightcade-compatible online gameplay until that integration is implemented and tested.
 

@@ -4,6 +4,7 @@
 
 - Added a Railway-ready browser launcher using the EmulatorJS FBNeo core, a responsive arcade UI, persistent keyboard/controller mapping, and private-room ROM fingerprint signaling.
 - Added production static-file streaming, compression, cache validators, immutable ROM-asset cache headers, and COOP/COEP headers for browser WebAssembly performance.
+- Added an explicit opt-in, loopback-only local ROM route so development sessions can auto-load the ignored `sfiii3.zip` without making public deployments serve ROM files.
 - Documented that private rooms establish signaling/peer transport only; deterministic synchronized gameplay has not been implemented or validated.
 - Added a read-only ZIP/ROM-set inspector with archive and member hashes.
 - Recorded the immutable input baseline in `inventory.json` and the reverse-engineering report.
