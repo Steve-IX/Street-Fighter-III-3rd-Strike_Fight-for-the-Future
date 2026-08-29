@@ -18,6 +18,12 @@ const MIME_TYPES = {
 };
 const COMPRESSIBLE_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.svg']);
 
+function cacheControlFor(extension) {
+  if (extension === '.html' || extension === '.js' || extension === '.css') return 'no-cache';
+  if (extension === '.bin') return 'public, max-age=31536000, immutable';
+  return 'public, max-age=3600, must-revalidate';
+}
+
 function safeRoomId(value) {
   return typeof value === 'string' && /^[A-Z0-9]{4,12}$/.test(value) ? value : null;
 }
@@ -77,7 +83,8 @@ const server = http.createServer((request, response) => {
     return;
   }
 
-  const requestPath = request.url === '/' ? '/index.html' : decodeURIComponent(request.url.split('?')[0]);
+  const rawRequestPath = decodeURIComponent(request.url.split('?')[0]);
+  const requestPath = rawRequestPath === '/' ? '/index.html' : rawRequestPath;
   if (requestPath === LOCAL_ROM_ROUTE) {
     streamLocalRom(request, response);
     return;
@@ -109,7 +116,7 @@ const server = http.createServer((request, response) => {
 
     const shouldCompress = COMPRESSIBLE_EXTENSIONS.has(extension) && /\bgzip\b/.test(request.headers['accept-encoding'] || '');
     const headers = {
-      'Cache-Control': extension === '.html' ? 'no-cache' : extension === '.bin' ? 'public, max-age=31536000, immutable' : 'public, max-age=3600, must-revalidate',
+      'Cache-Control': cacheControlFor(extension),
       'Content-Type': MIME_TYPES[extension] || 'application/octet-stream',
       ETag: etag
     };

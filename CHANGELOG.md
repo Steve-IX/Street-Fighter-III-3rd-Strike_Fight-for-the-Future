@@ -6,6 +6,7 @@
 - Added production static-file streaming, compression, cache validators, immutable ROM-asset cache headers, and COOP/COEP headers for browser WebAssembly performance.
 - Added an explicit opt-in, loopback-only local ROM route so development sessions can auto-load the ignored `sfiii3.zip` without making public deployments serve ROM files.
 - Fixed browser FBNeo loading by preserving the required `sfiii3.zip` virtual filename for arcade ZIP archives; verified the local launcher reaches the 3rd Strike attract screen.
+- Fixed keyboard control mapping by translating browser key names to EmulatorJS key names, setting the arcade control scheme, and using a fresh game ID to avoid stale saved mappings.
 - Documented that private rooms establish signaling/peer transport only; deterministic synchronized gameplay has not been implemented or validated.
 - Added a read-only ZIP/ROM-set inspector with archive and member hashes.
 - Recorded the immutable input baseline in `inventory.json` and the reverse-engineering report.

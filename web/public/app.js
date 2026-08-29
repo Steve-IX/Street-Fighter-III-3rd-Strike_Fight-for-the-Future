@@ -1,20 +1,31 @@
 const CONTROL_SLOTS = [
   ['Punch 1', 0, 'x', 'BUTTON_2'], ['Punch 2', 1, 's', 'BUTTON_4'],
   ['Coin', 2, 'shift', 'SELECT'], ['Start', 3, 'enter', 'START'],
-  ['Up', 4, 'ArrowUp', 'DPAD_UP'], ['Down', 5, 'ArrowDown', 'DPAD_DOWN'],
-  ['Left', 6, 'ArrowLeft', 'DPAD_LEFT'], ['Right', 7, 'ArrowRight', 'DPAD_RIGHT'],
+  ['Up', 4, 'up arrow', 'DPAD_UP'], ['Down', 5, 'down arrow', 'DPAD_DOWN'],
+  ['Left', 6, 'left arrow', 'DPAD_LEFT'], ['Right', 7, 'right arrow', 'DPAD_RIGHT'],
   ['Punch 3', 8, 'z', 'BUTTON_1'], ['Kick 1', 9, 'a', 'BUTTON_3'],
   ['Kick 2', 10, 'q', 'LEFT_TOP_SHOULDER'], ['Kick 3', 11, 'e', 'RIGHT_TOP_SHOULDER']
 ];
 const LOCAL_ROM_URL = '/local-rom/sfiii3.zip';
+const GAME_ID = 330990608;
+const KEY_ALIASES = {
+  ArrowUp: 'up arrow',
+  ArrowDown: 'down arrow',
+  ArrowLeft: 'left arrow',
+  ArrowRight: 'right arrow',
+  ' ': 'space',
+  Control: 'ctrl',
+  Escape: 'escape'
+};
 const DEFAULT_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , key]) => [name, key]));
 const DEFAULT_GAMEPAD_BINDINGS = Object.fromEntries(CONTROL_SLOTS.map(([name, , , gamepad]) => [name, gamepad]));
 const state = { bindings: loadBindings(), gamepadBindings: loadGamepadBindings(), file: null, romHash: null, objectUrl: null, romUrl: null, listening: null, roomId: null, socket: null, peer: null, channel: null, emulatorLoaded: false };
 const elements = Object.fromEntries(['rom-input', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage'].map((id) => [id, document.getElementById(id)]));
 
 function archiveName(file) { return file.name.toLowerCase() === 'sfiii3.zip' ? 'sfiii3.zip' : file.name; }
+function normalizeKey(key) { return KEY_ALIASES[key] || key.toLowerCase(); }
 
-function loadBindings() { try { return { ...DEFAULT_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-bindings') || '{}') }; } catch { return { ...DEFAULT_BINDINGS }; } }
+function loadBindings() { try { return Object.fromEntries(Object.entries({ ...DEFAULT_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-bindings') || '{}') }).map(([name, key]) => [name, normalizeKey(key)])); } catch { return { ...DEFAULT_BINDINGS }; } }
 function loadGamepadBindings() { try { return { ...DEFAULT_GAMEPAD_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-gamepad-bindings') || '{}') }; } catch { return { ...DEFAULT_GAMEPAD_BINDINGS }; } }
 function saveBindings() { localStorage.setItem('arcade-link-bindings', JSON.stringify(state.bindings)); localStorage.setItem('arcade-link-gamepad-bindings', JSON.stringify(state.gamepadBindings)); }
 function setText(id, text) { elements[id].textContent = text; }
@@ -32,7 +43,7 @@ function renderBindings() {
     elements['binding-list'].append(binding);
   }
 }
-function displayKey(key) { return key.replace('Arrow', '').replace(' ', ' ').toUpperCase(); }
+function displayKey(key) { return key.replace(' arrow', '').toUpperCase(); }
 function displayPad(binding) { return binding.replace('BUTTON_', 'B').replace('LEFT_TOP_SHOULDER', 'L1').replace('RIGHT_TOP_SHOULDER', 'R1').replace('DPAD_', 'D-'); }
 function updateGamepadState() {
   const pad = [...navigator.getGamepads()].find(Boolean);
@@ -85,6 +96,8 @@ function bootEmulator() {
   document.getElementById('game-container').replaceChildren();
   window.EJS_player = '#game-container';
   window.EJS_core = 'fbneo';
+  window.EJS_controlScheme = 'arcade';
+  window.EJS_gameID = GAME_ID;
   window.EJS_gameName = archiveName(state.file);
   window.EJS_gameUrl = state.romUrl || state.objectUrl;
   window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
@@ -161,7 +174,7 @@ function captureGamepadBinding() {
   requestAnimationFrame(captureGamepadBinding);
 }
 
-document.addEventListener('keydown', (event) => { if (!state.listening || event.repeat) return; event.preventDefault(); state.bindings[state.listening] = event.key; state.listening = null; saveBindings(); renderBindings(); });
+document.addEventListener('keydown', (event) => { if (!state.listening || event.repeat) return; event.preventDefault(); state.bindings[state.listening] = normalizeKey(event.key); state.listening = null; saveBindings(); renderBindings(); });
 document.getElementById('rom-input').addEventListener('change', ({ target }) => target.files[0] && loadRom(target.files[0]));
 document.getElementById('reset-controls').addEventListener('click', () => { state.bindings = { ...DEFAULT_BINDINGS }; state.gamepadBindings = { ...DEFAULT_GAMEPAD_BINDINGS }; saveBindings(); renderBindings(); });
 document.getElementById('fullscreen').addEventListener('click', () => document.fullscreenElement ? document.exitFullscreen() : elements['game-stage'].requestFullscreen());
