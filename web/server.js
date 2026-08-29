@@ -6,21 +6,19 @@ const { Server } = require('socket.io');
 
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 const MAX_ROOM_SIZE = 2;
-const LOCAL_ROM_ROUTE = '/local-rom/sfiii3.zip';
-const LOCAL_ROM_PATH = path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip');
-const LOCAL_ROM_HOSTING_ENABLED = process.env.ALLOW_LOCAL_ROM_HOSTING === '1';
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json',
-  '.svg': 'image/svg+xml'
+  '.svg': 'image/svg+xml',
+  '.zip': 'application/zip'
 };
 const COMPRESSIBLE_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.svg']);
 
 function cacheControlFor(extension) {
   if (extension === '.html' || extension === '.js' || extension === '.css') return 'no-cache';
-  if (extension === '.bin') return 'public, max-age=31536000, immutable';
+  if (extension === '.bin' || extension === '.zip') return 'public, max-age=31536000, immutable';
   return 'public, max-age=3600, must-revalidate';
 }
 
@@ -28,46 +26,75 @@ function safeRoomId(value) {
   return typeof value === 'string' && /^[A-Z0-9]{4,12}$/.test(value) ? value : null;
 }
 
-function isLoopbackHost(request) {
-  const hostHeader = (request.headers.host || '').toLowerCase();
-  const host = hostHeader.startsWith('[') ? hostHeader.slice(1, hostHeader.indexOf(']')) : hostHeader.replace(/:\d+$/, '');
-  return host === 'localhost' || host === '::1' || host.startsWith('127.');
+function resolveRomPath() {
+  const candidates = [
+    process.env.ROM_PATH,
+    path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip'),
+    path.resolve(__dirname, 'ROMS', 'sfiii3.zip'),
+    path.resolve(process.cwd(), 'ROMS', 'sfiii3.zip'),
+    path.resolve(process.cwd(), '..', 'ROMS', 'sfiii3.zip')
+  ].filter(Boolean);
+
+  for (const candidate of candidates) {
+    try {
+      if (fs.existsSync(candidate) && fs.statSync(candidate).isFile()) {
+        return candidate;
+      }
+    } catch {
+      // Continue to next candidate
+    }
+  }
+  return path.resolve(__dirname, '..', 'ROMS', 'sfiii3.zip');
 }
 
-function streamLocalRom(request, response) {
-  if (!LOCAL_ROM_HOSTING_ENABLED || !isLoopbackHost(request)) {
-    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-    response.end('Not found');
-    return;
-  }
+function isRomRoute(requestPath) {
+  const normalized = requestPath.toLowerCase();
+  return (
+    normalized === '/api/rom' ||
+    normalized === '/api/load-game' ||
+    normalized === '/local-rom/sfiii3.zip' ||
+    normalized === '/roms/sfiii3.zip' ||
+    normalized === '/rom/sfiii3.zip'
+  );
+}
 
-  fs.stat(LOCAL_ROM_PATH, (error, stats) => {
+function streamRom(request, response) {
+  const romPath = resolveRomPath();
+
+  fs.stat(romPath, (error, stats) => {
     if (error || !stats.isFile()) {
-      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
-      response.end('Local ROM not found');
+      response.writeHead(404, {
+        'Access-Control-Allow-Origin': '*',
+        'Content-Type': 'application/json; charset=utf-8'
+      });
+      response.end(JSON.stringify({ error: 'ROM file not found on server', searchPath: romPath }));
       return;
     }
 
     const etag = `W/"${stats.size}-${stats.mtimeMs}"`;
     if (request.headers['if-none-match'] === etag) {
-      response.writeHead(304);
+      response.writeHead(304, { 'Access-Control-Allow-Origin': '*' });
       response.end();
       return;
     }
 
     response.writeHead(200, {
-      'Cache-Control': 'private, no-store',
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'GET, HEAD, OPTIONS',
+      'Access-Control-Allow-Headers': '*',
+      'Cache-Control': 'public, max-age=86400',
       'Content-Disposition': 'inline; filename="sfiii3.zip"',
       'Content-Length': stats.size,
       'Content-Type': 'application/zip',
       ETag: etag
     });
+
     if (request.method === 'HEAD') {
       response.end();
       return;
     }
 
-    fs.createReadStream(LOCAL_ROM_PATH, { highWaterMark: 1024 * 1024 }).pipe(response);
+    fs.createReadStream(romPath, { highWaterMark: 1024 * 1024 }).pipe(response);
   });
 }
 
@@ -75,18 +102,28 @@ const server = http.createServer((request, response) => {
   response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
   response.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+  response.setHeader('Access-Control-Allow-Origin', '*');
   response.setHeader('X-Content-Type-Options', 'nosniff');
 
+  if (request.method === 'OPTIONS') {
+    response.setHeader('Access-Control-Allow-Methods', 'GET, HEAD, OPTIONS');
+    response.setHeader('Access-Control-Allow-Headers', '*');
+    response.writeHead(204);
+    response.end();
+    return;
+  }
+
   if (request.method !== 'GET' && request.method !== 'HEAD') {
-    response.writeHead(405, { Allow: 'GET, HEAD' });
+    response.writeHead(405, { Allow: 'GET, HEAD, OPTIONS' });
     response.end();
     return;
   }
 
   const rawRequestPath = decodeURIComponent(request.url.split('?')[0]);
   const requestPath = rawRequestPath === '/' ? '/index.html' : rawRequestPath;
-  if (requestPath === LOCAL_ROM_ROUTE) {
-    streamLocalRom(request, response);
+
+  if (isRomRoute(requestPath)) {
+    streamRom(request, response);
     return;
   }
 

@@ -6,7 +6,7 @@ const CONTROL_SLOTS = [
   ['Punch 3', 8, 'z', 'BUTTON_1'], ['Kick 1', 9, 'a', 'BUTTON_3'],
   ['Kick 2', 10, 'q', 'LEFT_TOP_SHOULDER'], ['Kick 3', 11, 'e', 'RIGHT_TOP_SHOULDER']
 ];
-const LOCAL_ROM_URL = '/local-rom/sfiii3.zip';
+const LOCAL_ROM_URL = '/api/rom';
 const GAME_ID = 330990608;
 const ANALOG_DEADZONE = 0.35;
 const KEY_ALIASES = {
@@ -111,25 +111,29 @@ async function loadRom(file) {
   bootEmulator();
 }
 async function autoLoadLocalRom() {
-  try {
-    const check = await fetch(LOCAL_ROM_URL, { method: 'HEAD', cache: 'no-store' });
-    if (!check.ok) return;
-    setText('rom-detail', 'Loading local server ROM...');
-    const response = await fetch(LOCAL_ROM_URL, { cache: 'no-store' });
-    if (!response.ok) throw new Error(`Local ROM request failed with ${response.status}`);
-    const blob = await response.blob();
-    const file = new File([blob], 'sfiii3.zip', { type: 'application/zip' });
-    state.file = file;
-    state.romUrl = LOCAL_ROM_URL;
-    state.romHash = await fingerprint(file);
-    setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
-    setText('game-title', 'SFIII3');
-    setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB local server file`);
-    bootEmulator();
-  } catch (error) {
-    console.warn('Local ROM auto-load failed:', error);
-    setText('rom-detail', 'Choose a legal FBNeo-compatible arcade archive.');
+  const candidateUrls = [LOCAL_ROM_URL, '/local-rom/sfiii3.zip', '/roms/sfiii3.zip'];
+  for (const url of candidateUrls) {
+    try {
+      const check = await fetch(url, { method: 'HEAD', cache: 'no-store' });
+      if (!check.ok) continue;
+      setText('rom-detail', 'Loading server ROM...');
+      const response = await fetch(url, { cache: 'no-store' });
+      if (!response.ok) throw new Error(`ROM request failed with ${response.status}`);
+      const blob = await response.blob();
+      const file = new File([blob], 'sfiii3.zip', { type: 'application/zip' });
+      state.file = file;
+      state.romUrl = url;
+      state.romHash = await fingerprint(file);
+      setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
+      setText('game-title', 'SFIII3');
+      setText('rom-detail', `${(file.size / 1024 / 1024).toFixed(1)} MB server file`);
+      bootEmulator();
+      return;
+    } catch (error) {
+      console.warn(`Server ROM auto-load failed for ${url}:`, error);
+    }
   }
+  setText('rom-detail', 'Choose a legal FBNeo-compatible arcade archive.');
 }
 function bootEmulator() {
   if (state.objectUrl) URL.revokeObjectURL(state.objectUrl);
