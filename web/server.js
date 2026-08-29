@@ -6,17 +6,61 @@ const { Server } = require('socket.io');
 
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
 const MAX_ROOM_SIZE = 2;
+const LOCAL_ROM_NAME = 'sfiii3.zip';
+const LOCAL_ROM_PATH = path.join(__dirname, '..', 'ROMS', LOCAL_ROM_NAME);
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
   '.html': 'text/html; charset=utf-8',
   '.js': 'application/javascript; charset=utf-8',
   '.json': 'application/json',
+  '.zip': 'application/zip',
   '.svg': 'image/svg+xml'
 };
 const COMPRESSIBLE_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.svg']);
 
 function safeRoomId(value) {
   return typeof value === 'string' && /^[A-Z0-9]{4,12}$/.test(value) ? value : null;
+}
+
+function isLoopbackHost(request) {
+  const host = request.headers.host;
+  if (!host) return false;
+  try {
+    const hostname = new URL(`http://${host}`).hostname;
+    return hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '[::1]';
+  } catch {
+    return false;
+  }
+}
+
+function serveLocalRom(request, response) {
+  if (!isLoopbackHost(request)) {
+    response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+    response.end('Not found');
+    return;
+  }
+
+  fs.stat(LOCAL_ROM_PATH, (error, stats) => {
+    if (error || !stats.isFile()) {
+      response.writeHead(404, { 'Content-Type': 'text/plain; charset=utf-8' });
+      response.end('Local ROM not found');
+      return;
+    }
+
+    response.writeHead(200, {
+      'Cache-Control': 'no-store',
+      'Content-Disposition': `inline; filename="${LOCAL_ROM_NAME}"`,
+      'Content-Length': stats.size,
+      'Content-Type': 'application/zip',
+      'X-Local-ROM-Name': LOCAL_ROM_NAME
+    });
+    if (request.method === 'HEAD') {
+      response.end();
+      return;
+    }
+
+    fs.createReadStream(LOCAL_ROM_PATH, { highWaterMark: 1024 * 1024 }).pipe(response);
+  });
 }
 
 const server = http.createServer((request, response) => {
@@ -32,6 +76,11 @@ const server = http.createServer((request, response) => {
   }
 
   const requestPath = request.url === '/' ? '/index.html' : decodeURIComponent(request.url.split('?')[0]);
+  if (requestPath === '/local-rom/sfiii3.zip') {
+    serveLocalRom(request, response);
+    return;
+  }
+
   const safePath = path.normalize(requestPath).replace(/^([.][.][\\/])+/, '');
   const filePath = path.join(__dirname, 'public', safePath);
 

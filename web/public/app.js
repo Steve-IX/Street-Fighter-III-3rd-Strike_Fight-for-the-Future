@@ -37,6 +37,24 @@ function updateGamepadState() {
   elements['gamepad-state'].lastElementChild.textContent = pad ? `${pad.id.slice(0, 38)} connected` : 'Waiting for a controller';
 }
 
+function isLocalBrowserSession() {
+  return location.hostname === 'localhost' || location.hostname === '127.0.0.1' || location.hostname === '[::1]';
+}
+
+async function autoLoadLocalRom() {
+  if (!isLocalBrowserSession()) return;
+  setText('rom-detail', 'Checking for local sfiii3.zip...');
+  try {
+    const response = await fetch('/local-rom/sfiii3.zip', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`local ROM unavailable: ${response.status}`);
+    const blob = await response.blob();
+    const file = new File([blob], response.headers.get('X-Local-ROM-Name') || 'sfiii3.zip', { type: 'application/zip' });
+    await loadRom(file);
+  } catch {
+    setText('rom-detail', 'Use a legal FBNeo-compatible arcade archive.');
+  }
+}
+
 async function fingerprint(file) {
   const hash = await crypto.subtle.digest('SHA-256', await file.arrayBuffer());
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
@@ -148,4 +166,4 @@ document.getElementById('join-room').addEventListener('click', () => joinRoom(el
 document.getElementById('copy-room').addEventListener('click', () => state.roomId && navigator.clipboard.writeText(state.roomId));
 window.addEventListener('gamepadconnected', updateGamepadState); window.addEventListener('gamepaddisconnected', updateGamepadState);
 elements['binding-list'].addEventListener('click', () => requestAnimationFrame(captureGamepadBinding));
-window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); if (window.lucide) window.lucide.createIcons();
+window.setInterval(updateGamepadState, 1000); renderBindings(); updateGamepadState(); autoLoadLocalRom(); if (window.lucide) window.lucide.createIcons();
