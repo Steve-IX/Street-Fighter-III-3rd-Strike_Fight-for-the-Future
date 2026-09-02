@@ -20,7 +20,7 @@ const COMPRESSIBLE_EXTENSIONS = new Set(['.css', '.html', '.js', '.json', '.svg'
 
 function cacheControlFor(extension) {
   if (extension === '.html' || extension === '.js' || extension === '.css') return 'no-cache';
-  if (extension === '.bin' || extension === '.zip') return 'public, max-age=31536000, immutable';
+  if (extension === '.bin' || extension === '.data' || extension === '.zip') return 'public, max-age=31536000, immutable';
   return 'public, max-age=3600, must-revalidate';
 }
 
@@ -176,6 +176,18 @@ const server = http.createServer((request, response) => {
   }
   if (requestPath === '/api/rom/metadata') {
     sendRomMetadata(response);
+    return;
+  }
+  if (requestPath === '/api/core/capabilities') {
+    sendJson(response, 200, {
+      core: 'fbneo',
+      distribution: 'emulatorjs-pinned',
+      assets: '/emulatorjs/manifest.json',
+      saveState: true,
+      telemetry: ['frame'],
+      gameMemoryTelemetry: false,
+      deterministicFrameStep: false
+    });
     return;
   }
   if (isRomRoute(requestPath)) {

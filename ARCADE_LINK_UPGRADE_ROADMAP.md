@@ -49,10 +49,14 @@ This document is the reference point for implementation decisions, validation, a
 - [x] Collapsible controls drawer and mobile touch-control surface.
 - [x] Reduced-motion and keyboard focus handling.
 - [x] Versioned local replay capture, IndexedDB persistence, import, and export.
+- [x] Replay library with selection, naming, deletion, timeline seeking, and playback.
+- [x] Scenario metadata with ROM compatibility, saved markers, and practice actions.
+- [x] Formal adapter methods for pause, reset, frame step, input, state, and telemetry.
 - [x] Engine adapter contract with honest unsupported save-state and telemetry reporting.
-- [ ] EmulatorJS self-hosting/pinning and Railway smoke automation.
-- [ ] Real save-state implementation through a patched or compatible EmulatorJS core.
-- [ ] Validated telemetry hooks sourced from FBNeo runtime memory.
+- [x] EmulatorJS self-hosting/pinning with an integrity manifest and same-origin loading.
+- [x] Real save-state adapter mapped to EmulatorJS `supportsStates`, `getState`, and `loadState` APIs.
+- [x] Observed frame-clock telemetry through EmulatorJS `getFrameNum`.
+- [ ] Validated game telemetry hooks sourced from FBNeo runtime memory.
 
 ### 4.1 Runtime state model
 
@@ -150,6 +154,8 @@ This milestone is the bridge between the current launcher and deeper emulator wo
 ### v0.2B: state adapter contract
 
 Introduce an `ArcadeEngine` interface:
+
+The implementation and validation plan for the real FBNeo ABI, state envelope, telemetry evidence, and pinned assets is maintained in [ARCADE_LINK_CORE_INTEGRATION.md](ARCADE_LINK_CORE_INTEGRATION.md).
 
 ```text
 loadGame() -> Promise<void>

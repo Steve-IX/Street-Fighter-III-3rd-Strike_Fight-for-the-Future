@@ -73,3 +73,21 @@ test('static path traversal is rejected', async () => {
   assert.notEqual(response.status, 200);
   assert.doesNotMatch(response.body.toString(), /Arcade Link listening/);
 });
+
+test('pinned EmulatorJS assets are served same-origin', async () => {
+  const manifest = await request('/emulatorjs/manifest.json');
+  const loader = await request('/emulatorjs/data/loader.js');
+  assert.equal(manifest.status, 200);
+  assert.equal(loader.status, 200);
+  assert.equal(JSON.parse(manifest.body).system, 'fbneo');
+  assert.match(loader.headers['cache-control'], /no-cache/);
+});
+
+test('core capability contract is explicit about telemetry scope', async () => {
+  const response = await request('/api/core/capabilities');
+  const capabilities = JSON.parse(response.body);
+  assert.equal(response.status, 200);
+  assert.equal(capabilities.saveState, true);
+  assert.deepEqual(capabilities.telemetry, ['frame']);
+  assert.equal(capabilities.gameMemoryTelemetry, false);
+});

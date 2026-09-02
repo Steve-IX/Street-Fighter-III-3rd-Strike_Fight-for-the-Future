@@ -7,6 +7,8 @@ const CONTROL_SLOTS = [
   ['Kick 2', 10, 'q', 'LEFT_TOP_SHOULDER'], ['Kick 3', 11, 'e', 'RIGHT_TOP_SHOULDER']
 ];
 const LOCAL_ROM_URL = '/api/rom';
+const EMULATOR_DATA_ROOT = '/emulatorjs/data/';
+const EMULATOR_BUILD = '20260902-fbneo-wasm';
 const GAME_ID = 330990608;
 const ANALOG_DEADZONE = 0.35;
 const KEY_ALIASES = {
@@ -48,11 +50,15 @@ const state = {
   replayEvents: [],
   replayStartedAt: 0,
   replayLast: null,
+  replaySelected: null,
+  replayPlayback: null,
+  scenarioSelected: null,
+  scenarioMarkers: [],
   stateSnapshot: null,
   gamepadInputs: {}
 };
 const elements = Object.fromEntries(
-  ['play-button', 'rom-detail', 'rom-progress', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage', 'status-rom', 'status-core', 'status-link', 'status-pad', 'controls-drawer', 'toggle-controls', 'palette-button', 'command-palette', 'close-palette', 'palette-filter', 'presentation-mode', 'record-replay', 'replay-status', 'export-replay', 'replay-import', 'save-state', 'load-state', 'telemetry-status']
+  ['play-button', 'rom-detail', 'rom-progress', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage', 'status-rom', 'status-core', 'status-link', 'status-pad', 'controls-drawer', 'toggle-controls', 'palette-button', 'command-palette', 'close-palette', 'palette-filter', 'presentation-mode', 'record-replay', 'replay-status', 'export-replay', 'replay-import', 'save-state', 'load-state', 'telemetry-status', 'replay-list', 'replay-name', 'refresh-replays', 'replay-timeline', 'replay-time', 'play-replay', 'scenario-select', 'scenario-name', 'save-scenario', 'load-scenario', 'add-marker', 'marker-list']
     .map((id) => [id, document.getElementById(id)])
 );
 
@@ -87,19 +93,48 @@ const replayStore = {
     return this.database;
   },
   async put(replay) { const database = await this.open(); return new Promise((resolve, reject) => { const request = database.transaction('replays', 'readwrite').objectStore('replays').put(replay); request.onsuccess = resolve; request.onerror = () => reject(request.error); }); },
-  async getLatest() { const database = await this.open(); return new Promise((resolve, reject) => { const request = database.transaction('replays').objectStore('replays').getAll(); request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt - a.createdAt)[0] || null); request.onerror = () => reject(request.error); }); }
+  async all() { const database = await this.open(); return new Promise((resolve, reject) => { const request = database.transaction('replays').objectStore('replays').getAll(); request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt - a.createdAt)); request.onerror = () => reject(request.error); }); },
+  async delete(id) { const database = await this.open(); return new Promise((resolve, reject) => { const request = database.transaction('replays', 'readwrite').objectStore('replays').delete(id); request.onsuccess = resolve; request.onerror = () => reject(request.error); }); }
+};
+
+const scenarioStore = {
+  async all() { return JSON.parse(localStorage.getItem('arcade-link-scenarios') || '[]'); },
+  async put(scenario) { const scenarios = await this.all(); const index = scenarios.findIndex((item) => item.id === scenario.id); if (index >= 0) scenarios[index] = scenario; else scenarios.push(scenario); localStorage.setItem('arcade-link-scenarios', JSON.stringify(scenarios)); },
+  async get(id) { return (await this.all()).find((scenario) => scenario.id === id) || null; }
 };
 
 function engineAdapter() {
   const manager = window.EJS_emulator?.gameManager || window.EJS_emulator?.manager;
+  const stateSupport = Boolean(manager?.supportsStates?.());
   return {
-    supported: typeof manager?.saveState === 'function' && typeof manager?.loadState === 'function',
-    captureState: async () => typeof manager?.saveState === 'function' ? manager.saveState() : null,
-    restoreState: async (snapshot) => typeof manager?.loadState === 'function' ? manager.loadState(snapshot) : false,
-    readTelemetry: () => null
+    pause: () => typeof manager?.toggleMainLoop === 'function' ? manager.toggleMainLoop(0) : false,
+    reset: () => typeof manager?.restart === 'function' ? manager.restart() : false,
+    stepFrame: () => false,
+    submitInput: (player, index, pressed) => typeof manager?.simulateInput === 'function' ? manager.simulateInput(player, index, pressed ? 1 : 0) : false,
+    supported: stateSupport && typeof manager?.getState === 'function' && typeof manager?.loadState === 'function',
+    captureState: async () => { try { return stateSupport && typeof manager?.getState === 'function' ? new Uint8Array(manager.getState()) : null; } catch { return null; } },
+    restoreState: async (snapshot) => { try { if (!stateSupport || typeof manager?.loadState !== 'function') return false; manager.loadState(new Uint8Array(snapshot)); return true; } catch { return false; } },
+    readTelemetry: () => typeof manager?.getFrameNum === 'function' ? { schema: 1, frame: manager.getFrameNum(), source: 'emulatorjs-frame-counter', confidence: 'observed' } : null,
+    capabilities: () => ({ pause: typeof manager?.toggleMainLoop === 'function', reset: typeof manager?.restart === 'function', stepFrame: false, input: typeof manager?.simulateInput === 'function', saveState: stateSupport, telemetry: typeof manager?.getFrameNum === 'function' })
   };
 }
-function updateTelemetryStatus() { setText('telemetry-status', engineAdapter().readTelemetry() ? 'TELEMETRY ACTIVE' : 'TELEMETRY CONTRACT READY'); }
+function updateTelemetryStatus() { const telemetry = engineAdapter().readTelemetry(); setText('telemetry-status', telemetry ? `FRAME CLOCK · ${telemetry.frame}` : 'TELEMETRY CONTRACT READY'); }
+async function loadCoreCapabilities() {
+  try {
+    const response = await fetch('/api/core/capabilities', { cache: 'no-store' });
+    const capabilities = await response.json();
+    setText('telemetry-status', capabilities.gameMemoryTelemetry ? 'MEMORY TELEMETRY READY' : 'FRAME CLOCK READY · RAM UNAVAILABLE');
+  } catch {
+    setText('telemetry-status', 'CORE CAPABILITIES UNKNOWN');
+  }
+}
+function refreshEngineCapabilities(attempt = 0) {
+  const supported = engineAdapter().supported;
+  elements['save-state'].disabled = !supported;
+  elements['load-state'].disabled = !supported || !state.stateSnapshot;
+  updateTelemetryStatus();
+  if (!supported && attempt < 20) window.setTimeout(() => refreshEngineCapabilities(attempt + 1), 500);
+}
 function recordReplayEvent(action, pressed) {
   if (!state.replayRecording) return;
   const now = performance.now();
@@ -117,7 +152,7 @@ async function toggleReplayRecording() {
     return;
   }
   state.replayRecording = false;
-  const replay = { schema: 1, id: crypto.randomUUID(), createdAt: Date.now(), durationMs: Math.round(performance.now() - state.replayStartedAt), romSha256: state.romHash, core: 'fbneo', bindings: { ...state.bindings }, events: state.replayEvents };
+  const replay = { schema: 1, id: crypto.randomUUID(), name: elements['replay-name'].value.trim() || `Replay ${new Date().toLocaleDateString()}`, createdAt: Date.now(), durationMs: Math.round(performance.now() - state.replayStartedAt), romSha256: state.romHash, core: 'fbneo', bindings: { ...state.bindings }, events: state.replayEvents };
   await replayStore.put(replay);
   state.replayLast = replay;
   setText('replay-status', `REPLAY SAVED · ${replay.events.length} INPUTS`);
@@ -134,9 +169,63 @@ async function importReplay(file) {
   try {
     const replay = JSON.parse(await file.text());
     if (replay.schema !== 1 || replay.romSha256 !== state.romHash || !Array.isArray(replay.events)) throw new Error('Replay is incompatible with this ROM.');
-    await replayStore.put(replay); state.replayLast = replay; setText('replay-status', `REPLAY IMPORTED · ${replay.events.length} INPUTS`);
+    await replayStore.put(replay); state.replayLast = replay; setText('replay-status', `REPLAY IMPORTED · ${replay.events.length} INPUTS`); await loadReplayLibrary();
   } catch (error) { setText('replay-status', error.message); }
 }
+function formatReplayTime(milliseconds) { const seconds = Math.max(0, Math.floor(milliseconds / 1000)); return `${String(Math.floor(seconds / 60)).padStart(2, '0')}:${String(seconds % 60).padStart(2, '0')}`; }
+function renderReplayTimeline() {
+  const replay = state.replaySelected;
+  if (!replay) return;
+  const timeline = elements['replay-timeline'];
+  timeline.max = Math.max(replay.durationMs, 1);
+  timeline.value = state.replayPlayback?.positionMs || 0;
+  elements['replay-time'].textContent = `${formatReplayTime(Number(timeline.value))} / ${formatReplayTime(replay.durationMs)}`;
+}
+function renderReplayLibrary(replays = []) {
+  elements['replay-list'].replaceChildren();
+  if (!replays.length) { elements['replay-list'].innerHTML = '<span class="empty-state">No local replays yet</span>'; elements['play-replay'].disabled = true; return; }
+  for (const replay of replays) {
+    const row = document.createElement('div'); row.className = 'replay-row';
+    const select = document.createElement('button'); select.className = 'replay-select'; select.type = 'button'; select.textContent = `${replay.name || 'Untitled replay'} · ${formatReplayTime(replay.durationMs)}`;
+    select.addEventListener('click', () => { state.replaySelected = replay; state.replayPlayback = null; elements['replay-name'].value = replay.name || ''; elements['play-replay'].disabled = false; renderReplayTimeline(); });
+    const remove = document.createElement('button'); remove.className = 'icon-button replay-delete'; remove.type = 'button'; remove.setAttribute('aria-label', 'Delete replay'); remove.title = 'Delete replay'; remove.innerHTML = '<i data-lucide="trash-2"></i>'; remove.addEventListener('click', async () => { await replayStore.delete(replay.id); if (state.replaySelected?.id === replay.id) state.replaySelected = null; loadReplayLibrary(); });
+    row.append(select, remove); elements['replay-list'].append(row);
+  }
+  if (window.lucide) window.lucide.createIcons();
+}
+async function loadReplayLibrary() { try { renderReplayLibrary(await replayStore.all()); } catch { setText('replay-status', 'REPLAY STORAGE UNAVAILABLE'); } }
+function replayInputIndex(action) { const match = /^slot-(\d+)$/.exec(action); return match ? Number.parseInt(match[1], 10) : -1; }
+function playSelectedReplay() {
+  const replay = state.replaySelected;
+  if (!replay || !state.emulatorLoaded) return;
+  state.replayPlayback = { positionMs: 0, eventIndex: 0, startedAt: performance.now() };
+  setText('replay-status', 'PLAYING REPLAY');
+  const tick = () => {
+    if (!state.replayPlayback || state.replaySelected?.id !== replay.id) return;
+    state.replayPlayback.positionMs = Math.min(replay.durationMs, performance.now() - state.replayPlayback.startedAt);
+    while (state.replayPlayback.eventIndex < replay.events.length && replay.events[state.replayPlayback.eventIndex].atMs <= state.replayPlayback.positionMs) {
+      const event = replay.events[state.replayPlayback.eventIndex++]; const index = replayInputIndex(event.action); if (index >= 0) engineAdapter().submitInput(0, index, event.pressed);
+    }
+    renderReplayTimeline();
+    if (state.replayPlayback.positionMs < replay.durationMs) requestAnimationFrame(tick); else { state.replayPlayback = null; setText('replay-status', 'REPLAY COMPLETE'); }
+  };
+  requestAnimationFrame(tick);
+}
+function seekReplay(positionMs) {
+  if (!state.replaySelected) return;
+  const replay = state.replaySelected;
+  state.replayPlayback = { positionMs, eventIndex: replay.events.findIndex((event) => event.atMs >= positionMs) };
+  if (state.replayPlayback.eventIndex < 0) state.replayPlayback.eventIndex = replay.events.length;
+  renderReplayTimeline();
+}
+function renderScenarios(scenarios) {
+  const select = elements['scenario-select']; select.replaceChildren(new Option('Select scenario', ''));
+  scenarios.forEach((scenario) => select.append(new Option(`${scenario.name} · ${scenario.markers.length} markers`, scenario.id)));
+}
+async function loadScenarioLibrary() { renderScenarios(await scenarioStore.all()); }
+function renderMarkers() { elements['marker-list'].replaceChildren(); if (!state.scenarioMarkers.length) { elements['marker-list'].innerHTML = '<span class="empty-state">No markers</span>'; return; } state.scenarioMarkers.forEach((marker) => { const item = document.createElement('div'); item.className = 'marker'; const label = document.createElement('span'); label.textContent = `${formatReplayTime(marker.atMs)} ${marker.label}`; const practice = document.createElement('button'); practice.className = 'text-button'; practice.type = 'button'; practice.textContent = 'Practice'; practice.disabled = !state.replaySelected; practice.addEventListener('click', () => { if (state.replaySelected) { seekReplay(marker.atMs); setText('replay-status', `PRACTICE MARKER · ${formatReplayTime(marker.atMs)}`); } }); item.append(label, practice); elements['marker-list'].append(item); }); }
+async function saveScenario() { const name = elements['scenario-name'].value.trim() || `Scenario ${new Date().toLocaleDateString()}`; const scenario = { id: state.scenarioSelected?.id || crypto.randomUUID(), schema: 1, name, romSha256: state.romHash, createdAt: state.scenarioSelected?.createdAt || Date.now(), replayId: state.replaySelected?.id || null, markers: state.scenarioMarkers }; await scenarioStore.put(scenario); state.scenarioSelected = scenario; await loadScenarioLibrary(); elements['scenario-select'].value = scenario.id; setText('replay-status', 'SCENARIO SAVED'); }
+async function loadScenario() { const scenario = await scenarioStore.get(elements['scenario-select'].value); if (!scenario) return; if (scenario.romSha256 !== state.romHash) { setText('replay-status', 'SCENARIO ROM MISMATCH'); return; } state.scenarioSelected = scenario; state.scenarioMarkers = scenario.markers || []; elements['scenario-name'].value = scenario.name; if (scenario.replayId) { state.replaySelected = (await replayStore.all()).find((replay) => replay.id === scenario.replayId) || null; if (state.replaySelected) elements['replay-name'].value = state.replaySelected.name || ''; } renderMarkers(); elements['presentation-mode'].value = 'training'; elements['game-stage'].classList.add('mode-training'); setText('replay-status', `SCENARIO LOADED · ${state.scenarioMarkers.length} MARKERS`); }
 
 function renderBindings() {
   if (!elements['binding-list']) return;
@@ -277,8 +366,9 @@ function bootEmulator() {
   window.EJS_gameID = GAME_ID;
   window.EJS_gameName = 'sfiii3.zip';
   window.EJS_gameUrl = state.objectUrl || state.romUrl || LOCAL_ROM_URL;
-  window.EJS_pathtodata = 'https://cdn.emulatorjs.org/stable/data/';
+  window.EJS_pathtodata = EMULATOR_DATA_ROOT;
   window.EJS_language = 'en-US';
+  window.EJS_disableAutoLang = false;
   window.EJS_startOnLoaded = true;
   window.EJS_threads = self.crossOriginIsolated === true;
   window.EJS_defaultControls = controlsForCore();
@@ -286,8 +376,8 @@ function bootEmulator() {
   window.EJS_volume = 0.8;
   window.EJS_disableDatabases = false;
   const script = document.createElement('script');
-  script.src = `${window.EJS_pathtodata}loader.js?cache=${Date.now()}`;
-  script.onload = () => { setCoreState('running'); updateTelemetryStatus(); const supported = typeof engineAdapter().captureState === 'function' && engineAdapter().supported; elements['save-state'].disabled = !supported; elements['load-state'].disabled = !supported; };
+  script.src = `${window.EJS_pathtodata}loader.js?build=${EMULATOR_BUILD}`;
+  script.onload = () => { setCoreState('running'); refreshEngineCapabilities(); };
   script.onerror = () => { setCoreState('error'); setText('rom-detail', 'The emulator core could not load. Check your connection and retry.'); };
   document.body.append(script);
 }
@@ -419,10 +509,18 @@ document.getElementById('reset-controls')?.addEventListener('click', () => { sta
 document.getElementById('fullscreen')?.addEventListener('click', () => document.fullscreenElement ? document.exitFullscreen() : elements['game-stage'].requestFullscreen());
 document.getElementById('focus-game')?.addEventListener('click', focusGame);
 document.getElementById('restart-game')?.addEventListener('click', restartGame);
-document.getElementById('pause-game')?.addEventListener('click', () => document.querySelector('#game-container canvas')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
+document.getElementById('pause-game')?.addEventListener('click', () => { if (!engineAdapter().pause()) document.querySelector('#game-container canvas')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })); });
 elements['record-replay']?.addEventListener('click', toggleReplayRecording);
 elements['export-replay']?.addEventListener('click', exportReplay);
 elements['replay-import']?.addEventListener('change', ({ target }) => target.files[0] && importReplay(target.files[0]));
+elements['refresh-replays']?.addEventListener('click', loadReplayLibrary);
+elements['play-replay']?.addEventListener('click', playSelectedReplay);
+elements['replay-name']?.addEventListener('change', async () => { if (!state.replaySelected) return; state.replaySelected.name = elements['replay-name'].value.trim(); await replayStore.put(state.replaySelected); loadReplayLibrary(); });
+elements['replay-timeline']?.addEventListener('input', ({ target }) => { seekReplay(Number(target.value)); });
+elements['save-scenario']?.addEventListener('click', saveScenario);
+elements['load-scenario']?.addEventListener('click', loadScenario);
+elements['scenario-select']?.addEventListener('change', ({ target }) => { elements['load-scenario'].disabled = !target.value; });
+elements['add-marker']?.addEventListener('click', () => { const atMs = state.replayPlayback?.positionMs || (state.replayRecording ? performance.now() - state.replayStartedAt : 0); state.scenarioMarkers.push({ atMs: Math.round(atMs), label: elements['scenario-name'].value.trim() || 'Practice marker' }); renderMarkers(); });
 elements['save-state']?.addEventListener('click', async () => { const snapshot = await engineAdapter().captureState(); if (snapshot) { state.stateSnapshot = snapshot; elements['load-state'].disabled = false; setText('telemetry-status', 'STATE CAPTURED'); } else setText('telemetry-status', 'SAVE STATE UNSUPPORTED'); });
 elements['load-state']?.addEventListener('click', async () => { if (!state.stateSnapshot) { setText('telemetry-status', 'NO STATE CAPTURED'); return; } const restored = await engineAdapter().restoreState(state.stateSnapshot); setText('telemetry-status', restored ? 'STATE RESTORED' : 'RESTORE UNSUPPORTED'); });
 document.getElementById('create-room')?.addEventListener('click', () => joinRoom(createRoomCode()));
@@ -449,6 +547,9 @@ updateGamepadState();
 if (elements['presentation-mode']) { elements['presentation-mode'].value = localStorage.getItem('arcade-link-mode') || 'cabinet'; elements['game-stage']?.classList.toggle('mode-training', elements['presentation-mode'].value === 'training'); }
 setRuntimeState('link', 'offline');
 setupTouchControls();
+loadReplayLibrary();
+loadScenarioLibrary();
+loadCoreCapabilities();
 requestAnimationFrame(pollGamepadInputs);
 if (window.lucide) window.lucide.createIcons();
 preloadServerRom();
