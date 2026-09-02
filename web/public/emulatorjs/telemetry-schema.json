@@ -1,0 +1,22 @@
+{
+  "schema": 1,
+  "source": "fbneo-runtime-export",
+  "status": "pending-runtime-bridge",
+  "fields": {
+    "frame": { "type": "uint64", "source": "EmulatorJS GameManager.getFrameNum", "status": "observed" },
+    "p1Current": { "type": "uint16", "address": "0x0206AA8C", "source": "tools/trace_input_state.lua", "status": "requires-wasm-export" },
+    "p2Current": { "type": "uint16", "address": "0x0206AA8E", "source": "tools/trace_input_state.lua", "status": "requires-wasm-export" },
+    "p1Previous": { "type": "uint16", "address": "0x0206AA90", "source": "tools/trace_input_state.lua", "status": "requires-wasm-export" },
+    "p2Previous": { "type": "uint16", "address": "0x0206AA92", "source": "tools/trace_input_state.lua", "status": "requires-wasm-export" },
+    "systemCurrent": { "type": "uint8", "address": "0x0206AA9C", "source": "tools/trace_input_state.lua", "status": "requires-wasm-export" },
+    "systemPrevious": { "type": "uint8", "address": "0x0206AA9D", "source": "tools/trace_input_state.lua", "status": "requires-wasm-export" },
+    "characterIds": { "type": "uint16[2]", "source": "Ghidra character metadata hypothesis", "status": "unvalidated" },
+    "health": { "type": "uint16[2]", "source": "none", "status": "unvalidated" },
+    "hitboxes": { "type": "array", "source": "none", "status": "unvalidated" }
+  },
+  "rules": [
+    "Never infer unvalidated fields from canvas pixels.",
+    "Every exported address must be cross-checked against the Lua trace and runtime frame boundary.",
+    "Telemetry snapshots must include ROM SHA-256 and core build ID."
+  ]
+}
