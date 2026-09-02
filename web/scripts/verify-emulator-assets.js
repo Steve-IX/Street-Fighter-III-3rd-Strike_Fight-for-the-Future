@@ -12,8 +12,10 @@ for (const [relativePath, expected] of Object.entries(manifest.assets)) {
     failures.push(`${relativePath}: missing`);
     continue;
   }
-  const bytes = fs.statSync(filePath).size;
-  const hash = crypto.createHash('sha256').update(fs.readFileSync(filePath)).digest('hex');
+  let content = fs.readFileSync(filePath);
+  if (/\.(?:css|js|json)$/.test(filePath)) content = Buffer.from(content.toString('utf8').replace(/\r\n/g, '\n'));
+  const bytes = content.length;
+  const hash = crypto.createHash('sha256').update(content).digest('hex');
   if (bytes !== expected.bytes) failures.push(`${relativePath}: expected ${expected.bytes} bytes, got ${bytes}`);
   if (hash !== expected.sha256) failures.push(`${relativePath}: SHA-256 mismatch`);
 }
