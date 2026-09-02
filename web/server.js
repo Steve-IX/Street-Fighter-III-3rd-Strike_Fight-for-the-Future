@@ -1,10 +1,12 @@
 const http = require('http');
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
 const { Server } = require('socket.io');
 
 const PORT = Number.parseInt(process.env.PORT, 10) || 3000;
+const SERVICE_VERSION = process.env.SERVICE_VERSION || '0.2.0';
 const MAX_ROOM_SIZE = 2;
 const MIME_TYPES = {
   '.css': 'text/css; charset=utf-8',
@@ -103,6 +105,47 @@ function streamRom(request, response) {
   });
 }
 
+function sendJson(response, statusCode, payload) {
+  const body = JSON.stringify(payload);
+  response.writeHead(statusCode, {
+    'Cache-Control': 'no-store',
+    'Content-Length': Buffer.byteLength(body),
+    'Content-Type': 'application/json; charset=utf-8'
+  });
+  response.end(body);
+}
+
+function sendHealth(response) {
+  sendJson(response, 200, {
+    ok: true,
+    service: 'arcade-link',
+    version: SERVICE_VERSION,
+    uptimeSeconds: Math.floor(process.uptime())
+  });
+}
+
+function sendRomMetadata(response) {
+  const romPath = resolveRomPath();
+  fs.stat(romPath, (error, stats) => {
+    if (error || !stats.isFile()) {
+      sendJson(response, 404, { available: false, filename: 'sfiii3.zip' });
+      return;
+    }
+
+    const hash = crypto.createHash('sha256');
+    const stream = fs.createReadStream(romPath);
+    stream.on('data', (chunk) => hash.update(chunk));
+    stream.on('error', () => sendJson(response, 500, { available: false, error: 'ROM metadata unavailable' }));
+    stream.on('end', () => sendJson(response, 200, {
+      available: true,
+      filename: 'sfiii3.zip',
+      bytes: stats.size,
+      modifiedAt: stats.mtime.toISOString(),
+      sha256: hash.digest('hex')
+    }));
+  });
+}
+
 const server = http.createServer((request, response) => {
   response.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
   response.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
@@ -127,6 +170,14 @@ const server = http.createServer((request, response) => {
   const rawRequestPath = decodeURIComponent(request.url.split('?')[0]);
   const requestPath = rawRequestPath === '/' ? '/index.html' : rawRequestPath;
 
+  if (requestPath === '/healthz') {
+    sendHealth(response);
+    return;
+  }
+  if (requestPath === '/api/rom/metadata') {
+    sendRomMetadata(response);
+    return;
+  }
   if (isRomRoute(requestPath)) {
     streamRom(request, response);
     return;
@@ -231,6 +282,12 @@ io.on('connection', (socket) => {
 server.keepAliveTimeout = 65000;
 server.headersTimeout = 70000;
 
-server.listen(PORT, '0.0.0.0', () => {
-  console.log(`Arcade Link listening on ${PORT}`);
-});
+function startServer(port = PORT) {
+  return server.listen(port, '0.0.0.0', () => {
+    console.log(`Arcade Link listening on ${port}`);
+  });
+}
+
+if (require.main === module) startServer();
+
+module.exports = { cacheControlFor, resolveRomPath, safeRoomId, sendHealth, sendRomMetadata, server, startServer };

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="description" content="A private, local-ROM FBNeo arcade launcher with controller mapping and room signaling.">
+  <meta name="description" content="Arcade Link Lab: a browser-based Street Fighter III arcade cabinet with controls, rooms, and training-ready presentation modes.">
   <title>Arcade Link</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -13,7 +13,7 @@
 <body>
   <header class="topbar">
     <a class="brand" href="/" aria-label="Arcade Link home"><span class="brand-mark">AL</span><span>ARCADE LINK</span></a>
-    <div class="connection"><span id="network-dot" class="status-dot"></span><span id="network-status">SIGNAL SERVER CONNECTING</span></div>
+    <div class="topbar-actions"><div class="connection"><span id="network-dot" class="status-dot"></span><span id="network-status">SIGNAL SERVER CONNECTING</span></div><button id="palette-button" class="icon-button" type="button" aria-label="Open command palette" title="Command palette"><i data-lucide="command"></i></button></div>
   </header>
 
   <main>
@@ -27,23 +27,35 @@
       </div>
       <div id="game-stage" class="game-stage">
         <div id="game-container"></div>
+        <div id="touch-controls" class="touch-controls" aria-label="Touch arcade controls">
+          <div class="touch-dpad"><button data-touch="up" aria-label="Up">&#9650;</button><button data-touch="left" aria-label="Left">&#9664;</button><button data-touch="down" aria-label="Down">&#9660;</button><button data-touch="right" aria-label="Right">&#9654;</button></div>
+          <div class="touch-buttons"><button data-touch="punch1" aria-label="Punch 1">P1</button><button data-touch="punch2" aria-label="Punch 2">P2</button><button data-touch="punch3" aria-label="Punch 3">P3</button><button data-touch="kick1" aria-label="Kick 1">K1</button><button data-touch="kick2" aria-label="Kick 2">K2</button><button data-touch="kick3" aria-label="Kick 3">K3</button></div>
+        </div>
         <div id="launch-panel" class="launch-panel">
           <div class="arcade-emblem"><i data-lucide="flame"></i></div>
           <h2>STREET FIGHTER III</h2>
           <p class="launch-subtitle">3RD STRIKE · FIGHT FOR THE FUTURE</p>
           <button id="play-button" class="primary-button play-btn" type="button"><i data-lucide="play"></i><span>PLAY NOW</span></button>
+          <progress id="rom-progress" class="rom-progress" max="100" value="0" aria-label="ROM loading progress"></progress>
           <span id="rom-detail" class="fine-print">Arcade cabinet ready to launch</span>
         </div>
       </div>
       <div class="stage-footer"><span id="core-status">READY TO PLAY</span><span id="rom-fingerprint">INITIALIZING</span></div>
     </section>
 
+    <section class="status-rail" aria-label="Arcade status">
+      <div class="status-item"><span class="status-label">ROM</span><strong id="status-rom">PREPARING</strong></div>
+      <div class="status-item"><span class="status-label">CORE</span><strong id="status-core">IDLE</strong></div>
+      <div class="status-item"><span class="status-label">LINK</span><strong id="status-link">OFFLINE</strong></div>
+      <div class="status-item"><span class="status-label">PAD</span><strong id="status-pad">WAITING</strong></div>
+      <label class="mode-select">VIEW <select id="presentation-mode" aria-label="Presentation mode"><option value="cabinet">Cabinet</option><option value="training">Training Lab</option><option value="replay">Replay</option><option value="spectator">Spectator</option></select></label>
+    </section>
+
     <section class="control-grid">
       <section class="panel remap-panel">
-        <div class="panel-heading"><div><p class="eyebrow">INPUT LAB</p><h2>Player 1 mapping</h2></div><button id="reset-controls" class="text-button" type="button">Reset defaults</button></div>
+        <div class="panel-heading"><div><p class="eyebrow">INPUT LAB</p><h2>Player 1 mapping</h2></div><button id="toggle-controls" class="text-button" type="button" aria-expanded="true">Collapse</button></div>
         <p class="panel-copy">Select a binding, then press a keyboard key or a controller button. Wired and Bluetooth gamepads use the browser Gamepad API. Restart the local session after remapping to apply it to the core.</p>
-        <div id="gamepad-state" class="gamepad-state"><i data-lucide="gamepad-2"></i><span>Waiting for a controller</span></div>
-        <div id="binding-list" class="binding-list"></div>
+        <div id="controls-drawer" class="controls-drawer"><div id="gamepad-state" class="gamepad-state"><i data-lucide="gamepad-2"></i><span>Waiting for a controller</span></div><div id="binding-list" class="binding-list"></div><button id="reset-controls" class="text-button" type="button">Reset defaults</button></div>
       </section>
 
       <section class="panel room-panel">
@@ -56,15 +68,20 @@
 
       <section class="panel session-panel">
         <div class="panel-heading"><div><p class="eyebrow">SESSION</p><h2>Quick actions</h2></div></div>
-        <div class="quick-actions"><button id="pause-game" class="secondary-button" type="button"><i data-lucide="pause"></i>Pause</button><button id="restart-game" class="secondary-button" type="button"><i data-lucide="rotate-ccw"></i>Restart Game</button></div>
-        <div class="legal-note"><i data-lucide="shield-check"></i><span>Direct peer connection with synchronized arcade session state.</span></div>
+        <div class="quick-actions"><button id="pause-game" class="secondary-button" type="button"><i data-lucide="pause"></i>Pause</button><button id="restart-game" class="secondary-button" type="button"><i data-lucide="rotate-ccw"></i>Restart Game</button><button id="record-replay" class="secondary-button" type="button"><i data-lucide="circle"></i>Record Replay</button><button id="save-state" class="secondary-button" type="button" disabled><i data-lucide="save"></i>Save State</button><button id="load-state" class="secondary-button" type="button" disabled><i data-lucide="upload"></i>Load State</button></div>
+        <div class="lab-readout"><span id="replay-status">REPLAY READY</span><span id="telemetry-status">TELEMETRY CONTRACT READY</span></div>
+        <input id="replay-import" type="file" accept="application/json,.json" hidden>
+        <div class="quick-actions"><button id="export-replay" class="text-button" type="button">Export replay</button><label class="text-button" for="replay-import">Import replay</label></div>
+        <div class="legal-note"><i data-lucide="shield-check"></i><span>Replay capture is local and includes the ROM fingerprint. Save-state and telemetry controls activate when the emulator adapter exposes those capabilities.</span></div>
       </section>
     </section>
   </main>
 
+  <dialog id="command-palette" class="command-palette" aria-labelledby="palette-title"><div class="palette-heading"><h2 id="palette-title">Arcade commands</h2><button id="close-palette" class="icon-button" type="button" aria-label="Close command palette"><i data-lucide="x"></i></button></div><input id="palette-filter" class="palette-filter" type="search" placeholder="FILTER COMMANDS" aria-label="Filter commands"><div class="palette-list"><button data-command="play" type="button"><i data-lucide="play"></i>Play now</button><button data-command="pause" type="button"><i data-lucide="pause"></i>Pause</button><button data-command="restart" type="button"><i data-lucide="rotate-ccw"></i>Restart game</button><button data-command="fullscreen" type="button"><i data-lucide="maximize"></i>Fullscreen</button><button data-command="controls" type="button"><i data-lucide="sliders-horizontal"></i>Toggle controls</button></div></dialog>
+
   <template id="binding-template"><button class="binding" type="button"><span class="binding-name"></span><kbd class="binding-key"></kbd></button></template>
   <script src="https://unpkg.com/lucide@0.468.0/dist/umd/lucide.min.js" crossorigin="anonymous"></script>
   <script src="/socket.io/socket.io.js"></script>
-  <script src="/app.js?v=20260829-gamepad"></script>
+  <script src="/app.js?v=20260902-foundation-lab"></script>
 </body>
 </html>

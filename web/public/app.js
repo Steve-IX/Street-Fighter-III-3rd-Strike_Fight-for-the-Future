@@ -44,10 +44,15 @@ const state = {
   channel: null,
   emulatorLoaded: false,
   pendingPlay: false,
+  replayRecording: false,
+  replayEvents: [],
+  replayStartedAt: 0,
+  replayLast: null,
+  stateSnapshot: null,
   gamepadInputs: {}
 };
 const elements = Object.fromEntries(
-  ['play-button', 'rom-detail', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage']
+  ['play-button', 'rom-detail', 'rom-progress', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage', 'status-rom', 'status-core', 'status-link', 'status-pad', 'controls-drawer', 'toggle-controls', 'palette-button', 'command-palette', 'close-palette', 'palette-filter', 'presentation-mode', 'record-replay', 'replay-status', 'export-replay', 'replay-import', 'save-state', 'load-state', 'telemetry-status']
     .map((id) => [id, document.getElementById(id)])
 );
 
@@ -58,8 +63,80 @@ function loadBindings() { try { return Object.fromEntries(Object.entries({ ...DE
 function loadGamepadBindings() { try { return { ...DEFAULT_GAMEPAD_BINDINGS, ...JSON.parse(localStorage.getItem('arcade-link-gamepad-bindings') || '{}') }; } catch { return { ...DEFAULT_GAMEPAD_BINDINGS }; } }
 function saveBindings() { localStorage.setItem('arcade-link-bindings', JSON.stringify(state.bindings)); localStorage.setItem('arcade-link-gamepad-bindings', JSON.stringify(state.gamepadBindings)); }
 function setText(id, text) { if (elements[id]) elements[id].textContent = text; }
+function setRuntimeState(part, value) {
+  const target = elements[`status-${part}`];
+  if (!target) return;
+  target.textContent = value.toUpperCase();
+  target.dataset.state = value;
+}
+function setRomState(value, detail = '') { setRuntimeState('rom', value); if (detail) setText('rom-detail', detail); }
+function setCoreState(value) { setRuntimeState('core', value); setText('core-status', value === 'running' ? 'FBNEO CORE RUNNING' : value.toUpperCase()); }
 function createRoomCode() { return crypto.getRandomValues(new Uint32Array(1))[0].toString(36).slice(0, 6).toUpperCase(); }
 function controlsForCore() { const player = {}; for (const [name, index] of CONTROL_SLOTS) player[index] = { value: state.bindings[name], value2: state.gamepadBindings[name] }; return { 0: player, 1: {}, 2: {}, 3: {} }; }
+
+const replayStore = {
+  database: null,
+  async open() {
+    if (this.database) return this.database;
+    this.database = await new Promise((resolve, reject) => {
+      const request = indexedDB.open('arcade-link-lab', 1);
+      request.onupgradeneeded = () => request.result.createObjectStore('replays', { keyPath: 'id' });
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => reject(request.error);
+    });
+    return this.database;
+  },
+  async put(replay) { const database = await this.open(); return new Promise((resolve, reject) => { const request = database.transaction('replays', 'readwrite').objectStore('replays').put(replay); request.onsuccess = resolve; request.onerror = () => reject(request.error); }); },
+  async getLatest() { const database = await this.open(); return new Promise((resolve, reject) => { const request = database.transaction('replays').objectStore('replays').getAll(); request.onsuccess = () => resolve(request.result.sort((a, b) => b.createdAt - a.createdAt)[0] || null); request.onerror = () => reject(request.error); }); }
+};
+
+function engineAdapter() {
+  const manager = window.EJS_emulator?.gameManager || window.EJS_emulator?.manager;
+  return {
+    supported: typeof manager?.saveState === 'function' && typeof manager?.loadState === 'function',
+    captureState: async () => typeof manager?.saveState === 'function' ? manager.saveState() : null,
+    restoreState: async (snapshot) => typeof manager?.loadState === 'function' ? manager.loadState(snapshot) : false,
+    readTelemetry: () => null
+  };
+}
+function updateTelemetryStatus() { setText('telemetry-status', engineAdapter().readTelemetry() ? 'TELEMETRY ACTIVE' : 'TELEMETRY CONTRACT READY'); }
+function recordReplayEvent(action, pressed) {
+  if (!state.replayRecording) return;
+  const now = performance.now();
+  state.replayEvents.push({ action, pressed, atMs: Math.round(now - state.replayStartedAt) });
+}
+async function toggleReplayRecording() {
+  if (!state.replayRecording) {
+    state.replayRecording = true;
+    state.replayEvents = [];
+    state.replayStartedAt = performance.now();
+    setText('replay-status', 'RECORDING REPLAY');
+    elements['record-replay'].classList.add('recording');
+    elements['record-replay'].innerHTML = '<i data-lucide="square"></i>Stop recording';
+    if (window.lucide) window.lucide.createIcons();
+    return;
+  }
+  state.replayRecording = false;
+  const replay = { schema: 1, id: crypto.randomUUID(), createdAt: Date.now(), durationMs: Math.round(performance.now() - state.replayStartedAt), romSha256: state.romHash, core: 'fbneo', bindings: { ...state.bindings }, events: state.replayEvents };
+  await replayStore.put(replay);
+  state.replayLast = replay;
+  setText('replay-status', `REPLAY SAVED · ${replay.events.length} INPUTS`);
+  elements['record-replay'].classList.remove('recording');
+  elements['record-replay'].innerHTML = '<i data-lucide="circle"></i>Record replay';
+  if (window.lucide) window.lucide.createIcons();
+}
+function exportReplay() {
+  if (!state.replayLast) { setText('replay-status', 'RECORD A REPLAY FIRST'); return; }
+  const blob = new Blob([JSON.stringify(state.replayLast, null, 2)], { type: 'application/json' });
+  const link = document.createElement('a'); link.href = URL.createObjectURL(blob); link.download = `arcade-link-${state.replayLast.id}.json`; link.click(); URL.revokeObjectURL(link.href);
+}
+async function importReplay(file) {
+  try {
+    const replay = JSON.parse(await file.text());
+    if (replay.schema !== 1 || replay.romSha256 !== state.romHash || !Array.isArray(replay.events)) throw new Error('Replay is incompatible with this ROM.');
+    await replayStore.put(replay); state.replayLast = replay; setText('replay-status', `REPLAY IMPORTED · ${replay.events.length} INPUTS`);
+  } catch (error) { setText('replay-status', error.message); }
+}
 
 function renderBindings() {
   if (!elements['binding-list']) return;
@@ -93,6 +170,7 @@ function simulateCoreInput(index, pressed) {
   if (state.gamepadInputs[index] === value) return;
   state.gamepadInputs[index] = value;
   target.simulateInput(0, index, value);
+  recordReplayEvent(`slot-${index}`, Boolean(pressed));
 }
 function pollGamepadInputs() {
   const pad = [...navigator.getGamepads()].find(Boolean);
@@ -113,6 +191,7 @@ function updateGamepadState() {
   const pad = [...navigator.getGamepads()].find(Boolean);
   elements['gamepad-state'].classList.toggle('connected', Boolean(pad));
   elements['gamepad-state'].lastElementChild.textContent = pad ? `${pad.id.slice(0, 38)} connected` : 'Waiting for a controller';
+  setRuntimeState('pad', pad ? 'connected' : 'waiting');
 }
 
 async function fingerprint(file) {
@@ -120,16 +199,37 @@ async function fingerprint(file) {
   return [...new Uint8Array(hash)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
+async function readRomResponse(response) {
+  if (!response.body) return response.blob();
+  const reader = response.body.getReader();
+  const total = Number.parseInt(response.headers.get('content-length') || '0', 10);
+  const chunks = [];
+  let received = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    chunks.push(value);
+    received += value.byteLength;
+    if (elements['rom-progress']) {
+      elements['rom-progress'].value = total ? Math.round((received / total) * 100) : 0;
+      elements['rom-progress'].classList.toggle('indeterminate', !total);
+    }
+  }
+  return new Blob(chunks, { type: 'application/zip' });
+}
+
 async function preloadServerRom() {
+  setRomState('preloading', 'Buffering arcade ROM from server...');
+  if (elements['rom-progress']) { elements['rom-progress'].value = 0; elements['rom-progress'].classList.add('active'); }
   const candidateUrls = [LOCAL_ROM_URL, '/local-rom/sfiii3.zip', '/roms/sfiii3.zip'];
   for (const url of candidateUrls) {
     try {
       const check = await fetch(url, { method: 'HEAD', cache: 'no-store' });
       if (!check.ok) continue;
-      setText('rom-detail', 'Buffering arcade ROM from server...');
+      setRomState('preloading', 'Buffering arcade ROM from server...');
       const response = await fetch(url, { cache: 'no-store' });
       if (!response.ok) throw new Error(`ROM request failed with ${response.status}`);
-      const blob = await response.blob();
+      const blob = await readRomResponse(response);
       const file = new File([blob], 'sfiii3.zip', { type: 'application/zip' });
       state.file = file;
       state.romUrl = url;
@@ -137,8 +237,8 @@ async function preloadServerRom() {
       state.romHash = await fingerprint(file);
       setText('rom-fingerprint', `SHA-256 ${state.romHash.slice(0, 12).toUpperCase()}`);
       setText('game-title', 'STREET FIGHTER III: 3RD STRIKE');
-      setText('rom-detail', 'Ready to launch · Click PLAY NOW');
-      setText('core-status', 'READY TO PLAY');
+      setRomState('ready', 'Ready to launch · Click PLAY NOW');
+      setCoreState('ready');
       if (elements['play-button']) {
         elements['play-button'].disabled = false;
         elements['play-button'].innerHTML = '<i data-lucide="play"></i><span>PLAY NOW</span>';
@@ -147,16 +247,18 @@ async function preloadServerRom() {
       if (state.pendingPlay) {
         bootEmulator();
       }
+      if (elements['rom-progress']) { elements['rom-progress'].value = 100; elements['rom-progress'].classList.remove('active', 'indeterminate'); }
       return true;
     } catch (error) {
       console.warn(`Server ROM preload failed for ${url}:`, error);
     }
   }
-  setText('rom-detail', 'Ready to launch · Click PLAY NOW');
-  setText('core-status', 'READY TO PLAY');
+  setRomState('error', 'Arcade ROM unavailable. Retry the page or check the deployment.');
+  setCoreState('error');
   if (state.pendingPlay) {
     bootEmulator();
   }
+  if (elements['rom-progress']) elements['rom-progress'].classList.remove('active');
   return false;
 }
 
@@ -166,7 +268,7 @@ function bootEmulator() {
   if (!state.objectUrl && state.file) {
     state.objectUrl = URL.createObjectURL(state.file);
   }
-  setText('core-status', 'LOADING FBNEO CORE');
+  setCoreState('booting');
   document.getElementById('launch-panel')?.remove();
   document.getElementById('game-container').replaceChildren();
   window.EJS_player = '#game-container';
@@ -185,8 +287,8 @@ function bootEmulator() {
   window.EJS_disableDatabases = false;
   const script = document.createElement('script');
   script.src = `${window.EJS_pathtodata}loader.js?cache=${Date.now()}`;
-  script.onload = () => setText('core-status', 'FBNEO CORE RUNNING');
-  script.onerror = () => setText('core-status', 'FBNEO CORE FAILED TO LOAD');
+  script.onload = () => { setCoreState('running'); updateTelemetryStatus(); const supported = typeof engineAdapter().captureState === 'function' && engineAdapter().supported; elements['save-state'].disabled = !supported; elements['load-state'].disabled = !supported; };
+  script.onerror = () => { setCoreState('error'); setText('rom-detail', 'The emulator core could not load. Check your connection and retry.'); };
   document.body.append(script);
 }
 
@@ -201,8 +303,8 @@ function setRoomState(text, ready = false) { setText('room-state', text); elemen
 function connectSignal() {
   if (state.socket) return;
   state.socket = io();
-  state.socket.on('connect', () => { elements['network-dot']?.classList.add('online'); setText('network-status', 'SIGNAL SERVER ONLINE'); });
-  state.socket.on('disconnect', () => { elements['network-dot']?.classList.remove('online'); setText('network-status', 'SIGNAL SERVER OFFLINE'); setRoomState('OFFLINE'); });
+  state.socket.on('connect', () => { elements['network-dot']?.classList.add('online'); setText('network-status', 'SIGNAL SERVER ONLINE'); setRuntimeState('link', 'connected'); });
+  state.socket.on('disconnect', () => { elements['network-dot']?.classList.remove('online'); setText('network-status', 'SIGNAL SERVER OFFLINE'); setRuntimeState('link', 'offline'); setRoomState('OFFLINE'); });
   state.socket.on('room:peer-joined', ({ peerId }) => establishPeer(peerId, true));
   state.socket.on('room:peer-left', () => { closePeer(); setText('peer-status', 'PEER LEFT'); setRoomState('WAITING'); });
   state.socket.on('signal', async ({ from, payload }) => receiveSignal(from, payload));
@@ -224,7 +326,7 @@ async function establishPeer(peerId, initiator) {
   closePeer();
   state.peer = new RTCPeerConnection({ iceServers: [{ urls: 'stun:stun.l.google.com:19302' }] });
   state.peer.onicecandidate = ({ candidate }) => { if (candidate) state.socket.emit('signal', { target: peerId, payload: { candidate } }); };
-  state.peer.onconnectionstatechange = () => { const connected = state.peer?.connectionState === 'connected'; if (connected) { setRoomState('PEER LINKED', true); setText('peer-status', 'TRANSPORT READY'); } };
+  state.peer.onconnectionstatechange = () => { const connected = state.peer?.connectionState === 'connected'; if (connected) { setRuntimeState('link', 'peer linked'); setRoomState('PEER LINKED', true); setText('peer-status', 'TRANSPORT READY'); } };
   state.peer.ondatachannel = ({ channel }) => bindChannel(channel);
   if (initiator) { bindChannel(state.peer.createDataChannel('arcade-link')); const offer = await state.peer.createOffer(); await state.peer.setLocalDescription(offer); state.socket.emit('signal', { target: peerId, payload: { description: state.peer.localDescription } }); }
 }
@@ -265,7 +367,9 @@ document.addEventListener('keydown', (event) => {
   if (!state.emulatorLoaded && (event.key === 'Enter' || event.key === ' ')) {
     bootEmulator();
   }
+  if (state.emulatorLoaded) recordReplayEvent(normalizeKey(event.key), true);
 });
+document.addEventListener('keyup', (event) => recordReplayEvent(normalizeKey(event.key), false));
 
 elements['play-button']?.addEventListener('click', async () => {
   if (state.emulatorLoaded) return;
@@ -281,11 +385,46 @@ elements['play-button']?.addEventListener('click', async () => {
   bootEmulator();
 });
 
+function toggleControls() {
+  const drawer = elements['controls-drawer'];
+  if (!drawer) return;
+  const collapsed = drawer.classList.toggle('is-collapsed');
+  elements['toggle-controls'].textContent = collapsed ? 'Expand' : 'Collapse';
+  elements['toggle-controls'].setAttribute('aria-expanded', String(!collapsed));
+}
+function togglePalette() {
+  const palette = elements['command-palette'];
+  if (!palette) return;
+  if (palette.open) palette.close();
+  else palette.showModal();
+}
+function runCommand(command) {
+  const actions = { play: () => elements['play-button']?.click(), pause: () => elements['pause-game']?.click(), restart: restartGame, fullscreen: () => elements['fullscreen']?.click(), controls: toggleControls };
+  actions[command]?.();
+  elements['command-palette']?.close();
+}
+function setupTouchControls() {
+  const slots = { up: 4, down: 5, left: 6, right: 7, punch1: 0, punch2: 1, punch3: 8, kick1: 9, kick2: 10, kick3: 11 };
+  document.querySelectorAll('[data-touch]').forEach((button) => {
+    const index = slots[button.dataset.touch];
+    const update = (event, pressed) => { event.preventDefault(); if (pressed) button.setPointerCapture?.(event.pointerId); simulateCoreInput(index, pressed); };
+    button.addEventListener('pointerdown', (event) => update(event, true));
+    button.addEventListener('pointerup', (event) => update(event, false));
+    button.addEventListener('pointercancel', (event) => update(event, false));
+    button.addEventListener('lostpointercapture', (event) => update(event, false));
+  });
+}
+
 document.getElementById('reset-controls')?.addEventListener('click', () => { state.bindings = { ...DEFAULT_BINDINGS }; state.gamepadBindings = { ...DEFAULT_GAMEPAD_BINDINGS }; saveBindings(); renderBindings(); });
 document.getElementById('fullscreen')?.addEventListener('click', () => document.fullscreenElement ? document.exitFullscreen() : elements['game-stage'].requestFullscreen());
 document.getElementById('focus-game')?.addEventListener('click', focusGame);
 document.getElementById('restart-game')?.addEventListener('click', restartGame);
 document.getElementById('pause-game')?.addEventListener('click', () => document.querySelector('#game-container canvas')?.dispatchEvent(new KeyboardEvent('keydown', { key: 'p', bubbles: true })));
+elements['record-replay']?.addEventListener('click', toggleReplayRecording);
+elements['export-replay']?.addEventListener('click', exportReplay);
+elements['replay-import']?.addEventListener('change', ({ target }) => target.files[0] && importReplay(target.files[0]));
+elements['save-state']?.addEventListener('click', async () => { const snapshot = await engineAdapter().captureState(); if (snapshot) { state.stateSnapshot = snapshot; elements['load-state'].disabled = false; setText('telemetry-status', 'STATE CAPTURED'); } else setText('telemetry-status', 'SAVE STATE UNSUPPORTED'); });
+elements['load-state']?.addEventListener('click', async () => { if (!state.stateSnapshot) { setText('telemetry-status', 'NO STATE CAPTURED'); return; } const restored = await engineAdapter().restoreState(state.stateSnapshot); setText('telemetry-status', restored ? 'STATE RESTORED' : 'RESTORE UNSUPPORTED'); });
 document.getElementById('create-room')?.addEventListener('click', () => joinRoom(createRoomCode()));
 document.getElementById('join-room')?.addEventListener('click', () => joinRoom(elements['room-code'].value.trim().toUpperCase()));
 document.getElementById('copy-room')?.addEventListener('click', () => state.roomId && navigator.clipboard.writeText(state.roomId));
@@ -293,8 +432,23 @@ window.addEventListener('gamepadconnected', updateGamepadState);
 window.addEventListener('gamepaddisconnected', updateGamepadState);
 elements['binding-list']?.addEventListener('click', () => requestAnimationFrame(captureGamepadBinding));
 window.setInterval(updateGamepadState, 1000);
+elements['toggle-controls']?.addEventListener('click', toggleControls);
+elements['palette-button']?.addEventListener('click', togglePalette);
+elements['close-palette']?.addEventListener('click', () => elements['command-palette']?.close());
+document.querySelectorAll('[data-command]').forEach((button) => button.addEventListener('click', () => runCommand(button.dataset.command)));
+elements['palette-filter']?.addEventListener('input', ({ target }) => {
+  const query = target.value.trim().toLowerCase();
+  document.querySelectorAll('[data-command]').forEach((button) => { button.hidden = query && !button.textContent.toLowerCase().includes(query); });
+});
+elements['command-palette']?.addEventListener('close', () => { if (elements['palette-filter']) elements['palette-filter'].value = ''; document.querySelectorAll('[data-command]').forEach((button) => { button.hidden = false; }); elements['palette-button']?.focus(); });
+elements['command-palette']?.addEventListener('click', (event) => { if (event.target === elements['command-palette']) elements['command-palette'].close(); });
+elements['presentation-mode']?.addEventListener('change', ({ target }) => { localStorage.setItem('arcade-link-mode', target.value); elements['game-stage']?.classList.toggle('mode-training', target.value === 'training'); });
+document.addEventListener('keydown', (event) => { if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'k') { event.preventDefault(); togglePalette(); } if (event.key === 'Escape' && elements['command-palette']?.open) elements['command-palette'].close(); });
 renderBindings();
 updateGamepadState();
+if (elements['presentation-mode']) { elements['presentation-mode'].value = localStorage.getItem('arcade-link-mode') || 'cabinet'; elements['game-stage']?.classList.toggle('mode-training', elements['presentation-mode'].value === 'training'); }
+setRuntimeState('link', 'offline');
+setupTouchControls();
 requestAnimationFrame(pollGamepadInputs);
 if (window.lucide) window.lucide.createIcons();
 preloadServerRom();
