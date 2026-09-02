@@ -38,7 +38,7 @@ h2 { font-size: 24px; line-height: 1; }
 .game-stage { position: relative; min-height: clamp(420px, 58vw, 730px); display: grid; place-items: center; overflow: hidden; background: repeating-linear-gradient(135deg, #202828 0 2px, #172020 2px 12px); }
 .game-stage.mode-training::after { content: 'TRAINING LAB'; position: absolute; top: 14px; left: 14px; padding: 5px 7px; color: var(--gold); border: 1px solid var(--gold); font: 700 10px "DM Mono", monospace; letter-spacing: .12em; pointer-events: none; }
 #game-container { width: 100%; min-height: inherit; display: grid; place-items: center; }
-#game-container canvas { max-width: 100%; max-height: min(70vh, 720px); }
+#game-container canvas { display: block; max-width: 100%; max-height: min(70vh, 720px); image-rendering: pixelated; contain: layout paint; transform: translateZ(0); }
 .launch-panel { width: min(490px, calc(100% - 38px)); text-align: center; padding: 38px 26px; border: 2px solid var(--ink); background: var(--panel); box-shadow: 7px 7px 0 var(--teal); }
 .launch-panel h2 { margin: 13px 0 6px; font-size: 34px; letter-spacing: .06em; }
 .launch-subtitle { margin: 0 0 20px; font: 700 12px "DM Mono", monospace; color: var(--red); letter-spacing: .12em; }

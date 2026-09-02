@@ -11,6 +11,13 @@ const EMULATOR_DATA_ROOT = '/emulatorjs/data/';
 const EMULATOR_BUILD = '20260902-fbneo-wasm';
 const GAME_ID = 330990608;
 const ANALOG_DEADZONE = 0.35;
+const RUNTIME_CAPABILITIES = Object.freeze({
+  sharedWasmMemory: self.crossOriginIsolated === true &&
+    typeof SharedArrayBuffer === 'function' &&
+    typeof Atomics === 'object' &&
+    typeof WebAssembly === 'object'
+});
+const CORE_INPUT_STATE = new Uint8Array(CONTROL_SLOTS.length);
 const KEY_ALIASES = {
   ArrowUp: 'up arrow',
   ArrowDown: 'down arrow',
@@ -54,8 +61,7 @@ const state = {
   replayPlayback: null,
   scenarioSelected: null,
   scenarioMarkers: [],
-  stateSnapshot: null,
-  gamepadInputs: {}
+  stateSnapshot: null
 };
 const elements = Object.fromEntries(
   ['play-button', 'rom-detail', 'rom-progress', 'game-title', 'core-status', 'rom-fingerprint', 'binding-list', 'gamepad-state', 'network-dot', 'network-status', 'room-state', 'create-room', 'copy-room', 'room-code', 'join-room', 'active-room', 'peer-status', 'game-stage', 'status-rom', 'status-core', 'status-link', 'status-pad', 'controls-drawer', 'toggle-controls', 'palette-button', 'command-palette', 'close-palette', 'palette-filter', 'presentation-mode', 'record-replay', 'replay-status', 'export-replay', 'replay-import', 'save-state', 'load-state', 'telemetry-status', 'replay-list', 'replay-name', 'refresh-replays', 'replay-timeline', 'replay-time', 'play-replay', 'scenario-select', 'scenario-name', 'save-scenario', 'load-scenario', 'add-marker', 'marker-list']
@@ -241,6 +247,14 @@ function renderBindings() {
 }
 function displayKey(key) { return key.replace(' arrow', '').toUpperCase(); }
 function displayPad(binding) { return binding.replace('BUTTON_', 'B').replace('LEFT_TOP_SHOULDER', 'L1').replace('RIGHT_TOP_SHOULDER', 'R1').replace('DPAD_', 'D-'); }
+function firstConnectedGamepad() {
+  const pads = navigator.getGamepads?.();
+  if (!pads) return null;
+  for (let index = 0; index < pads.length; index += 1) {
+    if (pads[index]) return pads[index];
+  }
+  return null;
+}
 function buttonIndex(binding) {
   const normalized = GAMEPAD_BUTTON_ALIASES[binding] || binding;
   const match = /^BUTTON_(\d+)$/.exec(normalized);
@@ -256,13 +270,13 @@ function simulateCoreInput(index, pressed) {
   const target = coreInputTarget();
   if (!target?.simulateInput) return;
   const value = pressed ? 1 : 0;
-  if (state.gamepadInputs[index] === value) return;
-  state.gamepadInputs[index] = value;
+  if (CORE_INPUT_STATE[index] === value) return;
+  CORE_INPUT_STATE[index] = value;
   target.simulateInput(0, index, value);
   recordReplayEvent(`slot-${index}`, Boolean(pressed));
 }
 function pollGamepadInputs() {
-  const pad = [...navigator.getGamepads()].find(Boolean);
+  const pad = firstConnectedGamepad();
   const leftX = axisValue(pad, 0);
   const leftY = axisValue(pad, 1);
   for (const [name, index] of CONTROL_SLOTS) {
@@ -277,7 +291,7 @@ function pollGamepadInputs() {
 }
 function updateGamepadState() {
   if (!elements['gamepad-state']) return;
-  const pad = [...navigator.getGamepads()].find(Boolean);
+  const pad = firstConnectedGamepad();
   elements['gamepad-state'].classList.toggle('connected', Boolean(pad));
   elements['gamepad-state'].lastElementChild.textContent = pad ? `${pad.id.slice(0, 38)} connected` : 'Waiting for a controller';
   setRuntimeState('pad', pad ? 'connected' : 'waiting');
@@ -370,7 +384,7 @@ function bootEmulator() {
   window.EJS_language = 'en-US';
   window.EJS_disableAutoLang = false;
   window.EJS_startOnLoaded = true;
-  window.EJS_threads = self.crossOriginIsolated === true;
+  window.EJS_threads = RUNTIME_CAPABILITIES.sharedWasmMemory;
   window.EJS_defaultControls = controlsForCore();
   window.EJS_color = '#d6472c';
   window.EJS_volume = 0.8;
