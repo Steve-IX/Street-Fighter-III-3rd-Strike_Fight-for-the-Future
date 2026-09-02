@@ -9,6 +9,7 @@
     "data/emulator.min.js": { "sha256": "6aec3fd7bb2721255801b0a6af02e47e78b05e28a1822b1f213aacbd348abaee", "bytes": 426343 },
     "data/loader.js": { "sha256": "69e0903bf1e2f62ced78895e7e511fa26e11316f7eb734925c35e919ba1287b2", "bytes": 7594 },
     "data/cores/fbneo-wasm.data": { "sha256": "315a25e0bcd61d58ee0d9e8b1dbf3740b9e0ca4b7d0726f848ce1068de73437c", "bytes": 8273551 },
+    "data/cores/fbneo-thread-wasm.data": { "sha256": "78ed565a670462465c2e62bfdcdb2bf6bbe6691ebdb998459a4196faae07eec9", "bytes": 8182154 },
     "data/cores/reports/fbneo.json": { "sha256": "d2c5e07c2afc2b53937f14b721d7d025ad599d111e9627fc77e9b3fd17450e70", "bytes": 119 },
     "data/localization/en-US.json": { "sha256": "b0c9a9bb92ecd2d03614ee2b0eeda160e883ee79ea94d9e8131addb92c5803f9", "bytes": 9825 },
     "data/compression/extract7z.js": { "sha256": "4ac9933b995a516cb6b3ca4027db860278372a20c21c405d93ceb1998498853a", "bytes": 280155 },

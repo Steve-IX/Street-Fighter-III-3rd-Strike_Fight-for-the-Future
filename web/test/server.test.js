@@ -78,9 +78,11 @@ test('pinned EmulatorJS assets are served same-origin', async () => {
   const manifest = await request('/emulatorjs/manifest.json');
   const loader = await request('/emulatorjs/data/loader.js');
   const compression = await request('/emulatorjs/data/compression/extract7z.js');
+  const threadedCore = await request('/emulatorjs/data/cores/fbneo-thread-wasm.data', 'HEAD');
   assert.equal(manifest.status, 200);
   assert.equal(loader.status, 200);
   assert.equal(compression.status, 200);
+  assert.equal(threadedCore.status, 200);
   assert.equal(JSON.parse(manifest.body).system, 'fbneo');
   assert.match(loader.headers['cache-control'], /no-cache/);
 });
